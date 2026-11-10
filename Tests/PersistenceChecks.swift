@@ -12,8 +12,9 @@ enum PersistenceChecks {
         var testError: Error?
 
         do {
-            fixture = try HDVirtualDisplay(width: 2560, height: 1440, refreshRate: 60,
-                                           name: "HiDPI Studio · Persistence Test")
+            fixture = try HDVirtualDisplay(
+                width: 2560, height: 1440, refreshRate: 60,
+                name: "HiDPI Studio · Persistence Test")
             guard let fixture else { throw DisplayFailure(message: "Persistence fixture was nil") }
             let displayID = fixture.displayID
             let high = try await DisplayCore.waitForHiDPI(displayID, size: CustomSize(width: 2560, height: 1440))
@@ -44,13 +45,14 @@ enum PersistenceChecks {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         // Always attempt layout cleanup, even when a worker/assertion failed.
-        do { try before.restore(scope: .forAppOnly) }
-        catch { if testError == nil { testError = error } }
-        try StudioChecks.require(Set(DisplayCore.onlineIDs()) == originalIDs,
-                                 "Persistence fixture did not disappear")
+        do { try before.restore(scope: .forAppOnly) } catch { if testError == nil { testError = error } }
+        try StudioChecks.require(
+            Set(DisplayCore.onlineIDs()) == originalIDs,
+            "Persistence fixture did not disappear")
         for entry in before.entries {
-            try StudioChecks.require(CGDisplayCopyDisplayMode(entry.id)?.ioDisplayModeID == entry.mode.ioDisplayModeID,
-                                     "Original physical display mode changed during persistence checks")
+            try StudioChecks.require(
+                CGDisplayCopyDisplayMode(entry.id)?.ioDisplayModeID == entry.mode.ioDisplayModeID,
+                "Original physical display mode changed during persistence checks")
         }
         print("PASS: persistence fixture cleanup and original physical modes")
         if let testError { throw testError }
@@ -58,15 +60,17 @@ enum PersistenceChecks {
 
     @MainActor static func worker(args: [String]) async throws {
         guard args.count == 3, let displayID = UInt32(args[0]), let modeID = Int32(args[1]),
-              ["trial", "confirm", "restore"].contains(args[2]) else {
+            ["trial", "confirm", "restore"].contains(args[2])
+        else {
             throw DisplayFailure(message: "Usage: --test-persistence-worker DISPLAY_ID MODE_ID trial|confirm|restore")
         }
         // This entry point can only target an app-created virtual fixture.
         guard CGDisplayVendorNumber(displayID) == 0x4844,
-              CGDisplayModelNumber(displayID) == 0x5354,
-              let fixture = DisplayCore.displays().first(where: { $0.id == displayID }),
-              let previous = fixture.current,
-              let requested = fixture.modes.first(where: { $0.id == modeID }) else {
+            CGDisplayModelNumber(displayID) == 0x5354,
+            let fixture = DisplayCore.displays().first(where: { $0.id == displayID }),
+            let previous = fixture.current,
+            let requested = fixture.modes.first(where: { $0.id == modeID })
+        else {
             throw DisplayFailure(message: "Persistence worker target is not an available virtual fixture/mode")
         }
         let model = DisplayModel(nativeSaveScope: .forSession)
@@ -102,7 +106,9 @@ enum PersistenceChecks {
         }
     }
 
-    @MainActor private static func runWorker(displayID: CGDirectDisplayID, mode: DisplayMode, action: String) async throws {
+    @MainActor private static func runWorker(displayID: CGDirectDisplayID, mode: DisplayMode, action: String)
+        async throws
+    {
         // Re-resolve mode IDs in case WindowServer regenerated its mode list.
         guard let currentMode = DisplayCore.modes(displayID).first(where: { $0.signature == mode.signature }) else {
             throw DisplayFailure(message: "Requested persistence-test mode disappeared")
@@ -133,11 +139,14 @@ enum PersistenceChecks {
         }
         let captured = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         guard process.terminationReason == .exit && process.terminationStatus == 0 else {
-            throw DisplayFailure(message: "Persistence worker \(action) failed (\(process.terminationStatus)): \(captured)")
+            throw DisplayFailure(
+                message: "Persistence worker \(action) failed (\(process.terminationStatus)): \(captured)")
         }
     }
 
-    @MainActor private static func expectMode(_ id: CGDirectDisplayID, _ mode: DisplayMode, context: String) async throws {
+    @MainActor private static func expectMode(_ id: CGDirectDisplayID, _ mode: DisplayMode, context: String)
+        async throws
+    {
         // Process exit and WindowServer's scope rollback need not be simultaneous.
         // Wait a settling interval before accepting the first matching value.
         try await Task.sleep(nanoseconds: 200_000_000)
@@ -146,9 +155,12 @@ enum PersistenceChecks {
             if let current = CGDisplayCopyDisplayMode(id), DisplayMode(raw: current).signature == mode.signature {
                 consecutiveMatches += 1
                 if consecutiveMatches == 3 { return }
-            } else { consecutiveMatches = 0 }
+            } else {
+                consecutiveMatches = 0
+            }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        throw DisplayFailure(message: "\(context): expected \(mode.sizeLabel) / \(mode.backingLabel) / \(mode.rateLabel)")
+        throw DisplayFailure(
+            message: "\(context): expected \(mode.sizeLabel) / \(mode.backingLabel) / \(mode.rateLabel)")
     }
 }

@@ -1,0 +1,106 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    name: Build, check and package arm64
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Show toolchain
+        run: |
+          uname -m
+          xcrun swiftc --version
+          test "$(uname -m)" = arm64
+      - name: Build, run isolated checks and create ZIP
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            ./scripts/package.sh "${GITHUB_REF_NAME#v}"
+          else
+            ./scripts/package.sh
+          fi
+      - name: Upload installer and checksums
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: HiDPIStudio-macOS-arm64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          overwrite: true
+
+  release:
+    name: Publish preview release
+    needs: build
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: HiDPIStudio-macOS-arm64
+          path: dist
+      - name: Verify downloaded installer
+        working-directory: dist
+        run: sha256sum --check "HiDPIStudio-${GITHUB_REF_NAME}-SHA256SUMS.txt"
+      - name: Prepare release notes
+        env:
+          STUDIO_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - "$STUDIO_TAG" > "$RUNNER_TEMP/release-notes.md" <<'PY'
+          import pathlib, sys
+          tag = sys.argv[1]
+          version = tag.removeprefix("v")
+          text = pathlib.Path("CHANGELOG.md").read_text()
+          heading = "## " + version + "\n"
+          if heading not in text:
+              raise SystemExit("Missing CHANGELOG entry for " + tag)
+          notes = text.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+          print(notes)
+          print("\n## 下载与运行\n")
+          print(f"下载 `HiDPIStudio-{tag}-macOS-arm64.zip`，解压后打开 **HiDPI Studio.app**。")
+          print("\n适用于 Apple Silicon，最低 macOS 13。此版本为预览版，采用 ad-hoc 签名，未经 Developer ID 签名或 Apple 公证。")
+          print(f"\n可使用 `shasum -a 256 --check HiDPIStudio-{tag}-SHA256SUMS.txt` 校验安装包。")
+          PY
+      - name: Upload to draft, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STUDIO_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft > "$RUNNER_TEMP/is-draft"; then
+            if [[ "$(cat "$RUNNER_TEMP/is-draft")" != true ]]; then
+              printf 'Release %s is already public; refusing to replace its assets.\n' "$STUDIO_TAG" >&2
+              exit 1
+            fi
+          else
+            gh release create "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --draft --prerelease \
+              --title "HiDPI Studio ${STUDIO_TAG#v} · 预览版" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release upload "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "dist/HiDPIStudio-${STUDIO_TAG}-macOS-arm64.zip" \
+            "dist/HiDPIStudio-${STUDIO_TAG}-SHA256SUMS.txt"
+          gh release edit "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --draft=false

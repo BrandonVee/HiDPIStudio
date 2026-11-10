@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)configure:(CGDisplayConfigRef)config
           display:(CGDirectDisplayID)display
              mode:(int32_t)modeID
-            error:(NSError * _Nullable * _Nullable)error;
+            error:(NSError *_Nullable *_Nullable)error;
 @end
 
 NS_ASSUME_NONNULL_END

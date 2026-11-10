@@ -11,12 +11,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) uint32_t chipAddress;
 @property(nonatomic, readonly, copy) NSString *ioDisplayLocation;
 + (BOOL)isAvailable;
-- (nullable instancetype)initWithDisplayID:(uint32_t)displayID error:(NSError * _Nullable * _Nullable)error;
-- (BOOL)validateConnection:(NSError * _Nullable * _Nullable)error;
+- (nullable instancetype)initWithDisplayID:(uint32_t)displayID error:(NSError *_Nullable *_Nullable)error;
+- (BOOL)validateConnection:(NSError *_Nullable *_Nullable)error;
 - (nullable NSData *)readBrightnessReply:(NSData *)request
-                             readOffset:(uint32_t)readOffset
-                                  error:(NSError * _Nullable * _Nullable)error;
-- (BOOL)writeBrightnessPacket:(NSData *)packet error:(NSError * _Nullable * _Nullable)error;
+                              readOffset:(uint32_t)readOffset
+                                   error:(NSError *_Nullable *_Nullable)error;
+- (BOOL)writeBrightnessPacket:(NSData *)packet error:(NSError *_Nullable *_Nullable)error;
 @end
 
 NS_ASSUME_NONNULL_END

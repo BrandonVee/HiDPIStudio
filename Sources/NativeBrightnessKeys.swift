@@ -13,8 +13,10 @@ struct NativeBrightnessKeyPacket: Equatable {
     let allowsAdjustment: Bool
     var delta: Double { key == 2 ? 0.05 : -0.05 }
 
-    static func decode(eventType: UInt32, subtype: Int16, data1: Int,
-                       modifiers: NSEvent.ModifierFlags) -> NativeBrightnessKeyPacket? {
+    static func decode(
+        eventType: UInt32, subtype: Int16, data1: Int,
+        modifiers: NSEvent.ModifierFlags
+    ) -> NativeBrightnessKeyPacket? {
         guard eventType == 14, subtype == 8 else { return nil }
         let value = UInt32(truncatingIfNeeded: data1)
         let key = UInt16((value >> 16) & 0xffff)
@@ -24,8 +26,9 @@ struct NativeBrightnessKeyPacket: Equatable {
         // Preserve modifier information until routing: a held key already taken
         // over by this app must not leak modified repeats to the system midway.
         let allowsAdjustment = modifiers.intersection([.command, .control, .option, .shift]).isEmpty
-        return NativeBrightnessKeyPacket(key: key, phase: state == 0x0a ? .down : .up,
-                                         isRepeat: value & 1 != 0, allowsAdjustment: allowsAdjustment)
+        return NativeBrightnessKeyPacket(
+            key: key, phase: state == 0x0a ? .down : .up,
+            isRepeat: value & 1 != 0, allowsAdjustment: allowsAdjustment)
     }
 }
 
@@ -46,19 +49,24 @@ struct NativeBrightnessKeyRouting {
     private var held: [UInt16: NativeBrightnessKeyTarget] = [:]
     mutating func reset() { held.removeAll() }
 
-    mutating func route(_ packet: NativeBrightnessKeyPacket,
-                        targetForNewPress: NativeBrightnessKeyTarget?,
-                        mayAdjust: (NativeBrightnessKeyTarget) -> Bool) -> NativeBrightnessKeyDecision {
+    mutating func route(
+        _ packet: NativeBrightnessKeyPacket,
+        targetForNewPress: NativeBrightnessKeyTarget?,
+        mayAdjust: (NativeBrightnessKeyTarget) -> Bool
+    ) -> NativeBrightnessKeyDecision {
         if packet.phase == .up {
             return NativeBrightnessKeyDecision(consume: held.removeValue(forKey: packet.key) != nil, adjustment: nil)
         }
         if let target = held[packet.key] {
             // Complete an already-handled sequence without leaking repeats to
             // macOS if its target disconnects or a display trial starts mid-hold.
-            return NativeBrightnessKeyDecision(consume: true,
+            return NativeBrightnessKeyDecision(
+                consume: true,
                 adjustment: packet.allowsAdjustment && mayAdjust(target) ? (target, packet.delta) : nil)
         }
-        guard packet.allowsAdjustment, !packet.isRepeat, let target = targetForNewPress, mayAdjust(target) else { return .passthrough }
+        guard packet.allowsAdjustment, !packet.isRepeat, let target = targetForNewPress, mayAdjust(target) else {
+            return .passthrough
+        }
         held[packet.key] = target
         return NativeBrightnessKeyDecision(consume: true, adjustment: (target, packet.delta))
     }
@@ -142,21 +150,31 @@ final class NativeBrightnessKeyManager: ObservableObject {
     }
 
     func openPermissionSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     private func ensureObservers() {
         guard observers.isEmpty else { return }
-        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.refreshPermission(retryIfTrusted: true) })
-        workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
-            object: nil, queue: .main) { [weak self] _ in
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in self?.refreshPermission(retryIfTrusted: true) })
+        workspaceObservers.append(
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.willSleepNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in
                 guard let self else { return }
                 self.stopTap()
                 if self.enabled { self.status = "休眠期间暂停监听，唤醒后重新检查权限。" }
             })
-        workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
-            object: nil, queue: .main) { [weak self] _ in self?.refreshPermission(retryIfTrusted: true) })
+        workspaceObservers.append(
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in self?.refreshPermission(retryIfTrusted: true) })
     }
 
     private func ensurePermissionTimer() {
@@ -170,12 +188,16 @@ final class NativeBrightnessKeyManager: ObservableObject {
         guard enabled, permissionGranted, !isShuttingDown else { return }
         stopTap()
         let mask = CGEventMask(1) << 14
-        guard let created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
-            options: .defaultTap, eventsOfInterest: mask, callback: { _, type, event, context in
-                guard let context else { return Unmanaged.passUnretained(event) }
-                let owner = Unmanaged<NativeBrightnessKeyManager>.fromOpaque(context).takeUnretainedValue()
-                return owner.handle(type: type, event: event)
-            }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+        guard
+            let created = CGEvent.tapCreate(
+                tap: .cgSessionEventTap, place: .headInsertEventTap,
+                options: .defaultTap, eventsOfInterest: mask,
+                callback: { _, type, event, context in
+                    guard let context else { return Unmanaged.passUnretained(event) }
+                    let owner = Unmanaged<NativeBrightnessKeyManager>.fromOpaque(context).takeUnretainedValue()
+                    return owner.handle(type: type, event: event)
+                }, userInfo: Unmanaged.passUnretained(self).toOpaque())
+        else {
             error = "系统未能启动亮度键监听。请检查辅助功能权限，或授权后重新打开应用。"
             status = "监听未启动，保留 macOS 原有行为。"
             return
@@ -186,7 +208,8 @@ final class NativeBrightnessKeyManager: ObservableObject {
             status = "监听未启动，保留 macOS 原有行为。"
             return
         }
-        tap = created; runLoopSource = source
+        tap = created
+        runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: created, enable: true)
         isActive = CGEvent.tapIsEnabled(tap: created)
@@ -211,13 +234,16 @@ final class NativeBrightnessKeyManager: ObservableObject {
         // Do not wait for the periodic UI permission check before passing events
         // through when access is revoked.
         guard AXIsProcessTrusted() else {
-            permissionGranted = false; stopTap()
+            permissionGranted = false
+            stopTap()
             status = "辅助功能权限已撤销，亮度键交由 macOS 处理。"
             return Unmanaged.passUnretained(event)
         }
         guard type.rawValue == 14, let nsEvent = NSEvent(cgEvent: event),
-              let packet = NativeBrightnessKeyPacket.decode(eventType: type.rawValue, subtype: nsEvent.subtype.rawValue,
-                                                            data1: nsEvent.data1, modifiers: nsEvent.modifierFlags) else {
+            let packet = NativeBrightnessKeyPacket.decode(
+                eventType: type.rawValue, subtype: nsEvent.subtype.rawValue,
+                data1: nsEvent.data1, modifiers: nsEvent.modifierFlags)
+        else {
             return Unmanaged.passUnretained(event)
         }
         let target = packet.phase == .down ? targetUnderPointer() : nil
@@ -226,7 +252,8 @@ final class NativeBrightnessKeyManager: ObservableObject {
             let expectedGeneration = generation
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.generation == expectedGeneration, self.enabled, self.isActive,
-                      !self.isShuttingDown, AXIsProcessTrusted(), self.mayAdjust(adjustment.target) else { return }
+                    !self.isShuttingDown, AXIsProcessTrusted(), self.mayAdjust(adjustment.target)
+                else { return }
                 self.onAdjust(adjustment.target.displayID, adjustment.delta)
             }
         }
@@ -235,18 +262,21 @@ final class NativeBrightnessKeyManager: ObservableObject {
 
     private func targetUnderPointer() -> NativeBrightnessKeyTarget? {
         guard !isBlocked(),
-              let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }),
-              let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+            let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }),
+            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else { return nil }
         let id = number.uint32Value
         guard let identity = DisplayIdentity.capture(id) else { return nil }
         return NativeBrightnessKeyTarget(displayID: id, identity: identity)
     }
 
     private func mayAdjust(_ target: NativeBrightnessKeyTarget) -> Bool {
-        guard !isBlocked(), CGDisplayIsOnline(target.displayID) != 0, CGDisplayIsActive(target.displayID) != 0, CGDisplayIsAsleep(target.displayID) == 0,
-              target.identity.matches(target.displayID),
-              !(CGDisplayVendorNumber(target.displayID) == 0x4844 && CGDisplayModelNumber(target.displayID) == 0x5354),
-              CGDisplayIsInMirrorSet(target.displayID) == 0 else { return false }
+        guard !isBlocked(), CGDisplayIsOnline(target.displayID) != 0, CGDisplayIsActive(target.displayID) != 0,
+            CGDisplayIsAsleep(target.displayID) == 0,
+            target.identity.matches(target.displayID),
+            !(CGDisplayVendorNumber(target.displayID) == 0x4844 && CGDisplayModelNumber(target.displayID) == 0x5354),
+            CGDisplayIsInMirrorSet(target.displayID) == 0
+        else { return false }
         return canHandle(target.displayID)
     }
 
@@ -257,14 +287,21 @@ final class NativeBrightnessKeyManager: ObservableObject {
         if let source = runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         runLoopSource = nil
         if let tap { CFMachPortInvalidate(tap) }
-        tap = nil; isActive = false
+        tap = nil
+        isActive = false
     }
-    private func stopPermissionTimer() { permissionTimer?.invalidate(); permissionTimer = nil }
+    private func stopPermissionTimer() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
+    }
     func shutdown() {
         isShuttingDown = true
-        stopTap(); stopPermissionTimer()
-        observers.forEach(NotificationCenter.default.removeObserver); observers.removeAll()
-        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver); workspaceObservers.removeAll()
+        stopTap()
+        stopPermissionTimer()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        workspaceObservers.removeAll()
     }
     deinit { shutdown() }
 }

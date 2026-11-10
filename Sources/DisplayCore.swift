@@ -16,16 +16,24 @@ struct DisplayMode: Identifiable {
     let refreshRate: Double
     let isHiddenNative: Bool
     init(raw: CGDisplayMode) {
-        self.raw = raw; id = raw.ioDisplayModeID
-        width = raw.width; height = raw.height
-        pixelWidth = raw.pixelWidth; pixelHeight = raw.pixelHeight
-        refreshRate = raw.refreshRate; isHiddenNative = false
+        self.raw = raw
+        id = raw.ioDisplayModeID
+        width = raw.width
+        height = raw.height
+        pixelWidth = raw.pixelWidth
+        pixelHeight = raw.pixelHeight
+        refreshRate = raw.refreshRate
+        isHiddenNative = false
     }
     init(hidden: HDHiddenDisplayMode) {
-        raw = nil; id = hidden.modeID
-        width = Int(hidden.width); height = Int(hidden.height)
-        pixelWidth = Int(hidden.pixelWidth); pixelHeight = Int(hidden.pixelHeight)
-        refreshRate = hidden.refreshRate; isHiddenNative = true
+        raw = nil
+        id = hidden.modeID
+        width = Int(hidden.width)
+        height = Int(hidden.height)
+        pixelWidth = Int(hidden.pixelWidth)
+        pixelHeight = Int(hidden.pixelHeight)
+        refreshRate = hidden.refreshRate
+        isHiddenNative = true
     }
     var isHiDPI: Bool { Self.isHiDPI(width: width, height: height, pixelsWide: pixelWidth, pixelsHigh: pixelHeight) }
     var sizeLabel: String { "\(width) × \(height)" }
@@ -82,7 +90,9 @@ struct CustomRefreshRate: Equatable {
 
 enum DisplayCore {
     static func check(_ error: CGError, _ operation: String) throws {
-        guard error == .success else { throw DisplayFailure(message: "\(operation)失败（macOS \(error.rawValue)）。请退出全屏应用后重试。") }
+        guard error == .success else {
+            throw DisplayFailure(message: "\(operation)失败（macOS \(error.rawValue)）。请退出全屏应用后重试。")
+        }
     }
 
     static func onlineIDs() -> [CGDirectDisplayID] {
@@ -104,7 +114,8 @@ enum DisplayCore {
         }
         let known = Set(modes.map(\.id))
         if CGDisplayIsBuiltin(id) == 0 && !(CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354) {
-            modes += HDHiddenDisplayModes.modes(forDisplay: id).filter { !known.contains($0.modeID) }.map(DisplayMode.init(hidden:))
+            modes += HDHiddenDisplayModes.modes(forDisplay: id).filter { !known.contains($0.modeID) }.map(
+                DisplayMode.init(hidden:))
         }
         return modes
     }
@@ -112,7 +123,9 @@ enum DisplayCore {
     static func displays() -> [DisplayInfo] {
         let screens = NSScreen.screens
         return onlineIDs().map { id in
-            let screen = screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id }
+            let screen = screens.first {
+                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id
+            }
             let builtin = CGDisplayIsBuiltin(id) != 0
             var seen = Set<String>()
             let available = modes(id).sorted {
@@ -121,9 +134,11 @@ enum DisplayCore {
                 if $0.isHiDPI != $1.isHiDPI { return $0.isHiDPI }
                 return $0.refreshRate > $1.refreshRate
             }.filter { seen.insert($0.signature).inserted }
-            return DisplayInfo(id: id, name: screen?.localizedName ?? (builtin ? "内置显示器" : "外接显示器 \(id)"),
-                               isBuiltin: builtin, isStudioVirtual: CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354,
-                               current: CGDisplayCopyDisplayMode(id).map(DisplayMode.init), modes: available)
+            return DisplayInfo(
+                id: id, name: screen?.localizedName ?? (builtin ? "内置显示器" : "外接显示器 \(id)"),
+                isBuiltin: builtin,
+                isStudioVirtual: CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354,
+                current: CGDisplayCopyDisplayMode(id).map(DisplayMode.init), modes: available)
         }.sorted { ($0.isBuiltin ? 1 : 0, $0.id) < ($1.isBuiltin ? 1 : 0, $1.id) }
     }
 
@@ -131,12 +146,17 @@ enum DisplayCore {
         var config: CGDisplayConfigRef?
         try check(CGBeginDisplayConfiguration(&config), "开始显示设置")
         guard let config else { throw DisplayFailure(message: "无法建立显示设置事务。") }
-        do { try body(config) } catch { CGCancelDisplayConfiguration(config); throw error }
+        do { try body(config) } catch {
+            CGCancelDisplayConfiguration(config)
+            throw error
+        }
         // Trials and virtual screens stay app-scoped; confirmation explicitly saves.
         try check(CGCompleteDisplayConfiguration(config, scope), "应用显示设置")
     }
 
-    static func setMode(_ display: CGDirectDisplayID, _ mode: CGDisplayMode, scope: CGConfigureOption = .forAppOnly) throws {
+    static func setMode(_ display: CGDirectDisplayID, _ mode: CGDisplayMode, scope: CGConfigureOption = .forAppOnly)
+        throws
+    {
         guard onlineIDs().contains(display) else { throw DisplayFailure(message: "显示器已断开，请刷新后重试。") }
         try configure(scope: scope) { try configureMode($0, display: display, mode: DisplayMode(raw: mode)) }
     }
@@ -146,22 +166,29 @@ enum DisplayCore {
             let result = CGConfigureDisplayWithDisplayMode(config, display, raw, nil)
             if result == .success { return }
             guard HDHiddenDisplayModes.modes(forDisplay: display).contains(where: { $0.modeID == mode.id }) else {
-                try check(result, "切换分辨率"); return
+                try check(result, "切换分辨率")
+                return
             }
         }
         try HDHiddenDisplayModes.configure(config, display: display, mode: mode.id)
     }
 
-    static func setMode(_ display: CGDirectDisplayID, _ mode: DisplayMode, scope: CGConfigureOption = .forAppOnly) throws {
-        guard onlineIDs().contains(display), modes(display).contains(where: {
-            $0.id == mode.id && $0.width == mode.width && $0.height == mode.height &&
-            $0.pixelWidth == mode.pixelWidth && $0.pixelHeight == mode.pixelHeight &&
-            ($0.refreshRate == mode.refreshRate || CustomRefreshRate.matches($0.refreshRate, mode.refreshRate))
-        }) else { throw DisplayFailure(message: "请求的显示模式已变化，请刷新后重试。") }
+    static func setMode(_ display: CGDirectDisplayID, _ mode: DisplayMode, scope: CGConfigureOption = .forAppOnly)
+        throws
+    {
+        guard onlineIDs().contains(display),
+            modes(display).contains(where: {
+                $0.id == mode.id && $0.width == mode.width && $0.height == mode.height
+                    && $0.pixelWidth == mode.pixelWidth && $0.pixelHeight == mode.pixelHeight
+                    && ($0.refreshRate == mode.refreshRate
+                        || CustomRefreshRate.matches($0.refreshRate, mode.refreshRate))
+            })
+        else { throw DisplayFailure(message: "请求的显示模式已变化，请刷新后重试。") }
         try configure(scope: scope) { try configureMode($0, display: display, mode: mode) }
     }
 
-    static func verify(_ id: CGDirectDisplayID, width: Int, height: Int, hiDPI: Bool, refreshRate: Double? = nil) throws {
+    static func verify(_ id: CGDirectDisplayID, width: Int, height: Int, hiDPI: Bool, refreshRate: Double? = nil) throws
+    {
         guard let raw = CGDisplayCopyDisplayMode(id) else { throw DisplayFailure(message: "无法读取切换后的显示模式。") }
         let mode = DisplayMode(raw: raw)
         guard mode.width == width, mode.height == height, mode.isHiDPI == hiDPI else {
@@ -182,16 +209,21 @@ enum DisplayCore {
         }
     }
 
-    static func waitForHiDPI(_ display: CGDirectDisplayID, size: CustomSize, refreshRate: Double? = nil) async throws -> DisplayMode {
+    static func waitForHiDPI(_ display: CGDirectDisplayID, size: CustomSize, refreshRate: Double? = nil) async throws
+        -> DisplayMode
+    {
         for _ in 0..<30 {
             if let mode = modes(display).first(where: { candidate in
-                candidate.width == size.width && candidate.height == size.height && candidate.isHiDPI &&
-                    (refreshRate.map { CustomRefreshRate.matches(candidate.refreshRate, $0) } ?? true)
-            }) { return mode }
+                candidate.width == size.width && candidate.height == size.height && candidate.isHiDPI
+                    && (refreshRate.map { CustomRefreshRate.matches(candidate.refreshRate, $0) } ?? true)
+            }) {
+                return mode
+            }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         let rateDescription = refreshRate.map { String(format: " / %.2f Hz", $0) } ?? ""
-        throw DisplayFailure(message: "macOS 没有发布 \(size.width) × \(size.height) HiDPI\(rateDescription) 模式。请尝试较低刷新率或较小桌面尺寸。")
+        throw DisplayFailure(
+            message: "macOS 没有发布 \(size.width) × \(size.height) HiDPI\(rateDescription) 模式。请尝试较低刷新率或较小桌面尺寸。")
     }
 }
 
@@ -208,8 +240,11 @@ struct DisplaySnapshot {
     let entries: [Entry]
     init(ids: [CGDirectDisplayID]) {
         entries = ids.compactMap { id in
-            CGDisplayCopyDisplayMode(id).map { Entry(id: id, mode: $0, origin: CGDisplayBounds(id).origin,
-                                                    mirror: CGDisplayMirrorsDisplay(id), identity: Self.identity(id)) }
+            CGDisplayCopyDisplayMode(id).map {
+                Entry(
+                    id: id, mode: $0, origin: CGDisplayBounds(id).origin,
+                    mirror: CGDisplayMirrorsDisplay(id), identity: Self.identity(id))
+            }
         }
     }
     private static func identity(_ id: CGDirectDisplayID) -> [UInt32] {
@@ -241,7 +276,8 @@ struct DisplaySnapshot {
             for entry in present {
                 try DisplayCore.check(CGConfigureDisplayMirrorOfDisplay(config, entry.id, 0), "取消临时镜像")
                 try DisplayCore.configureMode(config, display: entry.id, mode: DisplayMode(raw: entry.mode))
-                try DisplayCore.check(CGConfigureDisplayOrigin(config, entry.id, Int32(entry.origin.x), Int32(entry.origin.y)), "恢复位置")
+                try DisplayCore.check(
+                    CGConfigureDisplayOrigin(config, entry.id, Int32(entry.origin.x), Int32(entry.origin.y)), "恢复位置")
             }
             for entry in present where entry.mirror != 0 && validIDs.contains(entry.mirror) {
                 try DisplayCore.check(CGConfigureDisplayMirrorOfDisplay(config, entry.id, entry.mirror), "恢复原镜像")

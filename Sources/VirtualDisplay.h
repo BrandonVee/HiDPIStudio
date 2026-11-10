@@ -10,10 +10,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) CGDirectDisplayID displayID;
 + (BOOL)isAvailable;
 - (nullable instancetype)initWithWidth:(uint32_t)width
-                               height:(uint32_t)height
-                          refreshRate:(double)rate
-                                 name:(NSString *)name
-                                error:(NSError * _Nullable * _Nullable)error;
+                                height:(uint32_t)height
+                           refreshRate:(double)rate
+                                  name:(NSString *)name
+                                 error:(NSError *_Nullable *_Nullable)error;
 - (void)disconnect;
 @end
 

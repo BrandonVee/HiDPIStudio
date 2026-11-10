@@ -5,8 +5,9 @@ enum DDCLiveChecks {
         for display in DisplayCore.displays().filter({ !$0.isStudioVirtual }) {
             do {
                 let value = try await HardwareBrightness.read(displayID: display.id)
-                print("\(display.id) \(display.name): \(value.backend.rawValue) \(value.value * 100)%" +
-                      (value.rawCurrent.map { " raw=\($0)/\(value.rawMaximum ?? 0)" } ?? ""))
+                print(
+                    "\(display.id) \(display.name): \(value.backend.rawValue) \(value.value * 100)%"
+                        + (value.rawCurrent.map { " raw=\($0)/\(value.rawMaximum ?? 0)" } ?? ""))
             } catch { print("\(display.id) \(display.name): \(error.localizedDescription)") }
         }
     }
@@ -24,14 +25,18 @@ enum DDCLiveChecks {
         let target = raw > 0 ? raw - 1 : raw + 1
         var failure: Error?
         do {
-            let applied = try await HardwareBrightness.set(Double(target) / Double(maximum), displayID: displayID, expectedIdentity: before.identity)
-            try StudioChecks.require(applied.backend == .ddc && applied.rawCurrent == target && applied.rawMaximum == maximum,
-                                     "DDC 写入后实际读回与请求不符")
+            let applied = try await HardwareBrightness.set(
+                Double(target) / Double(maximum), displayID: displayID, expectedIdentity: before.identity)
+            try StudioChecks.require(
+                applied.backend == .ddc && applied.rawCurrent == target && applied.rawMaximum == maximum,
+                "DDC 写入后实际读回与请求不符")
             print("PASS: DDC actual readback \(raw)/\(maximum) → \(target)/\(maximum)")
         } catch { failure = error }
-        let restored = try await HardwareBrightness.set(before.value, displayID: displayID, expectedIdentity: before.identity)
-        try StudioChecks.require(restored.backend == .ddc && restored.rawCurrent == raw && restored.rawMaximum == maximum,
-                                 "未能验证恢复原始 DDC 亮度")
+        let restored = try await HardwareBrightness.set(
+            before.value, displayID: displayID, expectedIdentity: before.identity)
+        try StudioChecks.require(
+            restored.backend == .ddc && restored.rawCurrent == raw && restored.rawMaximum == maximum,
+            "未能验证恢复原始 DDC 亮度")
         print("PASS: DDC original brightness restored and verified \(raw)/\(maximum)")
         if let failure { throw failure }
     }

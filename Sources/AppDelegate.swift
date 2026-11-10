@@ -1,8 +1,8 @@
 import AppKit
-import SwiftUI
 import Combine
+import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopoverDelegate {
     let model = DisplayModel()
     let daily = DailyControlManager()
     let workspace = VirtualWorkspace()
@@ -14,35 +14,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var subscriptions = Set<AnyCancellable>()
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
+    private let statusPopover = NSPopover()
     private var terminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let icon = AppBranding.icon { NSApp.applicationIconImage = icon }
         model.externalOperationBlocked = { [weak self] in
             guard let self else { return true }
-            let otherVirtual = DisplayCore.displays().contains { $0.isStudioVirtual && $0.id != self.model.virtualSourceID }
-            return self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens || otherVirtual || self.autoRestore.isBusy
+            let otherVirtual = DisplayCore.displays().contains {
+                $0.isStudioVirtual && $0.id != self.model.virtualSourceID
+            }
+            return self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy
+                || self.workspace.hasConnectedScreens || otherVirtual || self.autoRestore.isBusy
         }
         layouts.isBlocked = { [weak self] in
             guard let self else { return true }
-            return self.model.hasPendingConfiguration || self.model.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens
+            return self.model.hasPendingConfiguration || self.model.isBusy || self.workspace.isBusy
+                || self.workspace.hasConnectedScreens
         }
         workspace.isBlocked = { [weak self] in
             guard let self else { return true }
-            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending || self.layouts.isBusy || self.autoRestore.isBusy
+            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending
+                || self.layouts.isBusy || self.autoRestore.isBusy
         }
         daily.isBlocked = { [weak self] in
             guard let self else { return true }
-            return self.model.hasTrial || self.model.isBusy || self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy || self.autoRestore.isBusy
+            return self.model.hasTrial || self.model.isBusy || self.layouts.isPending || self.layouts.isBusy
+                || self.workspace.isBusy || self.autoRestore.isBusy
         }
         brightnessSync.isBlocked = { [weak self] in
             guard let self else { return true }
-            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens || self.autoRestore.isBusy
+            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending
+                || self.layouts.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens
+                || self.autoRestore.isBusy
         }
         autoRestore.isBlocked = { [weak self] in
             guard let self else { return true }
-            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens
+            return self.model.hasPendingConfiguration || self.model.isBusy || self.layouts.isPending
+                || self.layouts.isBusy || self.workspace.isBusy || self.workspace.hasConnectedScreens
         }
-        daily.onManualBrightnessRequest = { [weak self] id, value in self?.brightnessSync.noteManualChange(displayID: id, value: value) }
+        daily.onManualBrightnessRequest = { [weak self] id, value in
+            self?.brightnessSync.noteManualChange(displayID: id, value: value)
+        }
         brightnessSync.onApplied = { [weak self] reading in self?.daily.acceptObservedBrightness(reading) }
         nativeKeys.canHandle = { [weak self] id in self?.daily.nativeReading(for: id) != nil }
         nativeKeys.isBlocked = { [weak self] in self?.daily.isBlocked() ?? true }
@@ -81,77 +94,211 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于 HiDPI Studio", action: #selector(about), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出 HiDPI Studio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        appItem.submenu = appMenu; menu.addItem(appItem)
+        appMenu.addItem(
+            withTitle: "退出 HiDPI Studio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        menu.addItem(appItem)
         let editItem = NSMenuItem()
         let editMenu = NSMenu(title: "编辑")
         editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        editItem.submenu = editMenu; menu.addItem(editItem)
+        editItem.submenu = editMenu
+        menu.addItem(editItem)
         NSApp.mainMenu = menu
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem?.button?.image = NSImage(systemSymbolName: "display", accessibilityDescription: "HiDPI Studio")
-        let statusMenu = NSMenu()
-        statusMenu.delegate = self
-        menuNeedsUpdate(statusMenu)
-        statusItem?.menu = statusMenu
+        statusItem?.button?.image = AppBranding.menuBarIcon()
+        statusItem?.button?.setAccessibilityLabel("HiDPI Studio")
+        statusItem?.button?.toolTip = "HiDPI Studio · 显示控制中心（右键打开快捷菜单）"
+        statusItem?.button?.target = self
+        statusItem?.button?.action = #selector(toggleStatusPanel(_:))
+        statusItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        statusPopover.behavior = .transient
+        statusPopover.delegate = self
 
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1020, height: 900),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1020, height: 900),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "HiDPI Studio"
-        window.contentView = NSHostingView(rootView: StudioView(model: model, daily: daily, workspace: workspace, layouts: layouts, shortcuts: shortcuts, brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys))
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.contentView = NSHostingView(
+            rootView: StudioView(
+                model: model, daily: daily, workspace: workspace, layouts: layouts, shortcuts: shortcuts,
+                brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys))
         window.minSize = NSSize(width: 900, height: 748)
         window.isReleasedWhenClosed = false
         window.center()
         self.window = window
         showWindow()
     }
+    @objc private func toggleStatusPanel(_ sender: NSStatusBarButton) {
+        guard !terminating else { return }
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            statusPopover.performClose(nil)
+            let menu = NSMenu()
+            menuNeedsUpdate(menu)
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.minY), in: sender)
+            return
+        }
+        if statusPopover.isShown {
+            statusPopover.performClose(nil)
+            return
+        }
+        let height = min(650, max(360, (sender.window?.screen?.visibleFrame.height ?? 730) - 80))
+        let panel = StatusPanelView(
+            model: model, daily: daily, layouts: layouts, workspace: workspace,
+            brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys,
+            openSection: { [weak self] in self?.openStatusSection($0) },
+            applyFavorite: { [weak self] in self?.applyFavorite(id: $0) },
+            applyProfile: { [weak self] in self?.applyProfile(id: $0) },
+            refresh: { [weak self] in self?.refreshFromStatus() },
+            exportDiagnostics: { [weak self] in
+                self?.showWindow()
+                self?.model.exportDiagnostics()
+            },
+            about: { [weak self] in
+                self?.statusPopover.performClose(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                self?.about()
+            },
+            quit: { NSApp.terminate(nil) }, panelHeight: height)
+        statusPopover.contentViewController = NSHostingController(rootView: panel)
+        statusPopover.contentSize = NSSize(width: 368, height: height)
+        statusPopover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        daily.refreshSystemBrightness(displayID: model.selectedDisplay)
+        statusPopover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        statusPopover.contentViewController?.view.window?.makeKey()
+        sender.highlight(true)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        statusItem?.button?.highlight(false)
+        // Each opening gets fresh local UI state without retaining hidden controls.
+        statusPopover.contentViewController = nil
+    }
+
+    private func openStatusSection(_ section: StudioSection) {
+        if layouts.isPending || layouts.isBusy {
+            model.activeSection = .layouts
+        } else if model.hasTrial || model.isBusy {
+            model.activeSection = .resolution
+        } else {
+            model.activeSection = section
+        }
+        showWindow()
+    }
+
+    private func refreshFromStatus() {
+        guard !model.hasTrial, !model.isBusy, !layouts.isPending, !layouts.isBusy,
+            !workspace.isBusy, !autoRestore.isBusy
+        else { return }
+        model.refresh()
+        brightnessSync.refreshScreens()
+        daily.refreshSystemBrightness(displayID: model.selectedDisplay)
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let open = menu.addItem(withTitle: "打开 HiDPI Studio", action: #selector(showWindow), keyEquivalent: "")
-        open.target = self
+        menu.autoenablesItems = false
+        func item(_ title: String, symbol: String, action: Selector) -> NSMenuItem {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            entry.target = self
+            entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            return entry
+        }
+        let summary = NSMenuItem(title: model.currentDisplay?.name ?? "未连接显示器", action: nil, keyEquivalent: "")
+        summary.isEnabled = false
+        menu.addItem(summary)
+        if let display = model.currentDisplay, let mode = model.renderedMode(for: display) {
+            let detail = NSMenuItem(
+                title: mode.sizeLabel + " · " + mode.rateLabel + (mode.isHiDPI ? " · HiDPI" : ""),
+                action: nil, keyEquivalent: "")
+            detail.isEnabled = false
+            menu.addItem(detail)
+        }
+        menu.addItem(.separator())
+        menu.addItem(item("打开 HiDPI Studio", symbol: "macwindow", action: #selector(showWindow)))
         let favorites = NSMenuItem(title: "收藏分辨率", action: nil, keyEquivalent: "")
+        favorites.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
         let favoriteMenu = NSMenu()
-        for item in daily.favorites {
-            let entry = favoriteMenu.addItem(withTitle: item.name + " · " + item.mode.label, action: #selector(applyFavoriteMenu(_:)), keyEquivalent: "")
-            entry.target = self; entry.representedObject = item.id.uuidString
+        favoriteMenu.autoenablesItems = false
+        for favorite in daily.favorites {
+            let entry = item(
+                favorite.name + " · " + favorite.displayName, symbol: "display",
+                action: #selector(applyFavoriteMenu(_:)))
+            entry.representedObject = favorite.id.uuidString
+            entry.isEnabled =
+                !daily.isBlocked() && !model.hasPendingConfiguration && !workspace.hasConnectedScreens
+                && !model.externalOperationBlocked() && favorite.identity.resolve() != nil
+            favoriteMenu.addItem(entry)
         }
-        if daily.favorites.isEmpty { favoriteMenu.addItem(withTitle: "暂无收藏", action: nil, keyEquivalent: "") }
-        favorites.submenu = favoriteMenu; menu.addItem(favorites)
-        let profiles = NSMenuItem(title: "显示配置", action: nil, keyEquivalent: "")
+        if daily.favorites.isEmpty {
+            let empty = NSMenuItem(title: "暂无收藏", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            favoriteMenu.addItem(empty)
+        }
+        favorites.submenu = favoriteMenu
+        menu.addItem(favorites)
+        let profiles = NSMenuItem(title: "布局预设", action: nil, keyEquivalent: "")
+        profiles.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: nil)
         let profileMenu = NSMenu()
-        for item in layouts.profiles {
-            let entry = profileMenu.addItem(withTitle: item.name, action: #selector(applyProfileMenu(_:)), keyEquivalent: "")
-            entry.target = self; entry.representedObject = item.id.uuidString
+        profileMenu.autoenablesItems = false
+        for profile in layouts.profiles {
+            let entry = item(profile.name, symbol: "rectangle.3.group", action: #selector(applyProfileMenu(_:)))
+            entry.representedObject = profile.id.uuidString
+            entry.isEnabled = layouts.canModify && layouts.unavailableReason(for: profile) == nil
+            profileMenu.addItem(entry)
         }
-        if layouts.profiles.isEmpty { profileMenu.addItem(withTitle: "暂无预设", action: nil, keyEquivalent: "") }
-        profiles.submenu = profileMenu; menu.addItem(profiles)
+        if layouts.profiles.isEmpty {
+            let empty = NSMenuItem(title: "暂无预设", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            profileMenu.addItem(empty)
+        }
+        profiles.submenu = profileMenu
+        menu.addItem(profiles)
         menu.addItem(.separator())
-        let clear = menu.addItem(withTitle: "移除全部软件滤镜", action: #selector(resetFilters), keyEquivalent: ""); clear.target = self
-        let restore = menu.addItem(withTitle: "恢复本次分辨率设置", action: #selector(restore), keyEquivalent: ""); restore.target = self
+        let clear = item("移除全部软件滤镜", symbol: "camera.filters", action: #selector(resetFilters))
+        clear.isEnabled = daily.activeFilterCount > 0 && !daily.isBlocked()
+        menu.addItem(clear)
+        let restore = item("恢复本次分辨率设置", symbol: "arrow.uturn.backward", action: #selector(restore))
+        restore.isEnabled = model.hasChanges && !model.isBusy && !model.hasTrial && !model.externalOperationBlocked()
+        menu.addItem(restore)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出 HiDPI Studio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(
+            title: "退出 HiDPI Studio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        menu.addItem(quit)
     }
     private func openFavorite(at index: Int) {
-        guard daily.favorites.indices.contains(index), readyToChangeDisplay() else { return }
-        model.activeSection = .resolution; showWindow()
-        daily.applyFavorite(id: daily.favorites[index].id, displayModel: model)
+        guard daily.favorites.indices.contains(index) else { return }
+        applyFavorite(id: daily.favorites[index].id)
     }
     private func openProfile(at index: Int) {
-        guard layouts.profiles.indices.contains(index), readyToChangeDisplay() else { return }
-        model.activeSection = .layouts; showWindow()
-        layouts.applyProfile(id: layouts.profiles[index].id)
+        guard layouts.profiles.indices.contains(index) else { return }
+        applyProfile(id: layouts.profiles[index].id)
+    }
+    private func applyFavorite(id: UUID) {
+        guard readyToChangeDisplay() else { return }
+        model.activeSection = .resolution
+        showWindow()
+        daily.applyFavorite(id: id, displayModel: model)
+    }
+    private func applyProfile(id: UUID) {
+        guard readyToChangeDisplay() else { return }
+        model.activeSection = .layouts
+        showWindow()
+        layouts.applyProfile(id: id)
     }
     @objc private func applyFavoriteMenu(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? String, let id = UUID(uuidString: value), readyToChangeDisplay() else { return }
-        model.activeSection = .resolution; showWindow(); daily.applyFavorite(id: id, displayModel: model)
+        guard let value = sender.representedObject as? String, let id = UUID(uuidString: value) else { return }
+        applyFavorite(id: id)
     }
     @objc private func applyProfileMenu(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? String, let id = UUID(uuidString: value), readyToChangeDisplay() else { return }
-        model.activeSection = .layouts; showWindow(); layouts.applyProfile(id: id)
+        guard let value = sender.representedObject as? String, let id = UUID(uuidString: value) else { return }
+        applyProfile(id: id)
     }
     @objc private func resetFilters() { daily.resetAll() }
     private func manualDisplayOperationStarted() {
@@ -159,25 +306,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !autoRestore.isBusy { autoRestore.cancelPendingForUserChange() }
     }
     private func readyToChangeDisplay() -> Bool {
-        if layouts.isPending || layouts.isBusy { model.activeSection = .layouts; showWindow(); return false }
-        if model.hasPendingConfiguration || model.isBusy { model.activeSection = .resolution; showWindow(); return false }
-        if workspace.isBusy || workspace.hasConnectedScreens { model.activeSection = .virtual; showWindow(); return false }
+        if autoRestore.isBusy {
+            model.activeSection = .automation
+            showWindow()
+            return false
+        }
+        if layouts.isPending || layouts.isBusy {
+            model.activeSection = .layouts
+            showWindow()
+            return false
+        }
+        if model.hasPendingConfiguration || model.isBusy {
+            model.activeSection = .resolution
+            showWindow()
+            return false
+        }
+        if workspace.isBusy || workspace.hasConnectedScreens {
+            model.activeSection = .virtual
+            showWindow()
+            return false
+        }
         return true
     }
     @objc func showWindow() {
+        statusPopover.performClose(nil)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
     @objc func restore() { Task { @MainActor in await model.restoreAll() } }
     @objc func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "HiDPI Studio", .applicationVersion: "2.3",
-            .credits: NSAttributedString(string: "独立实现的 macOS 显示管理工具\nHiDPI · 软件滤镜 · 虚拟屏幕 · 画中画 · 布局预设\n与 BetterDisplay 无关联")])
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "HiDPI Studio",
+            .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                ?? "development",
+            .credits: NSAttributedString(
+                string: "独立实现的 macOS 显示管理工具\nHiDPI · 软件滤镜 · 虚拟屏幕 · 画中画 · 布局预设\n与 BetterDisplay 无关联"),
+        ])
     }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showWindow()
+        return true
+    }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if terminating { return .terminateNow }
         terminating = true
+        statusPopover.performClose(nil)
         nativeKeys.shutdown()
         autoRestore.shutdown()
         brightnessSync.shutdown()

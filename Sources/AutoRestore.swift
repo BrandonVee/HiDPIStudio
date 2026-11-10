@@ -11,7 +11,8 @@ struct AutoRestoreTopology: Equatable {
         var connections: [String: CGDirectDisplayID] = [:]
         for id in DisplayCore.onlineIDs() {
             guard !(CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354),
-                  let identity = DisplayIdentity.capture(id) else { continue }
+                let identity = DisplayIdentity.capture(id)
+            else { continue }
             connections[identity.uuid] = id
         }
         return AutoRestoreTopology(connections: connections)
@@ -36,12 +37,15 @@ struct AutoRestoreEventPolicy {
     static let retryWindow: TimeInterval = 15
 
     static func isPhysicalConnectionEvent(_ flags: CGDisplayChangeSummaryFlags, isStudioVirtual: Bool) -> Bool {
-        !isStudioVirtual && !flags.contains(.beginConfigurationFlag) &&
-            (flags.contains(.addFlag) || flags.contains(.removeFlag))
+        !isStudioVirtual && !flags.contains(.beginConfigurationFlag)
+            && (flags.contains(.addFlag) || flags.contains(.removeFlag))
     }
 
     mutating func observe(_ value: AutoRestoreTopology, at now: Date) -> Bool {
-        guard let previous = topology else { topology = value; return false }
+        guard let previous = topology else {
+            topology = value
+            return false
+        }
         topology = value
         guard value != previous else { return false }
         arm(.connection, at: now)
@@ -49,13 +53,15 @@ struct AutoRestoreEventPolicy {
     }
     mutating func arm(_ reason: Reason, at now: Date) {
         generation &+= 1
-        request = Request(generation: generation, reason: reason,
-                          deadline: now.addingTimeInterval(Self.retryWindow),
-                          notBefore: now.addingTimeInterval(Self.settleDelay), attempts: 0)
+        request = Request(
+            generation: generation, reason: reason,
+            deadline: now.addingTimeInterval(Self.retryWindow),
+            notBefore: now.addingTimeInterval(Self.settleDelay), attempts: 0)
     }
     mutating func consumeAttempt(generation expected: UInt64, at now: Date) -> Bool {
         guard var pending = request, pending.generation == expected, now >= pending.notBefore, now <= pending.deadline,
-              pending.attempts < Self.maximumAttempts else { return false }
+            pending.attempts < Self.maximumAttempts
+        else { return false }
         pending.attempts += 1
         pending.notBefore = now.addingTimeInterval(Self.settleDelay)
         request = pending
@@ -65,7 +71,10 @@ struct AutoRestoreEventPolicy {
         guard let pending = request, pending.generation == expected else { return false }
         return pending.attempts < Self.maximumAttempts && now.addingTimeInterval(Self.settleDelay) <= pending.deadline
     }
-    mutating func cancel() { generation &+= 1; request = nil }
+    mutating func cancel() {
+        generation &+= 1
+        request = nil
+    }
 }
 
 /// Kept alive while registered with CoreGraphics. The weak owner prevents a
@@ -105,11 +114,13 @@ final class AutoRestoreManager: ObservableObject {
 
     private static let reconfigurationCallback: CGDisplayReconfigurationCallBack = { displayID, flags, context in
         guard let context, !flags.contains(.beginConfigurationFlag),
-              flags.contains(.addFlag) || flags.contains(.removeFlag) else { return }
+            flags.contains(.addFlag) || flags.contains(.removeFlag)
+        else { return }
         let registration = Unmanaged<AutoRestoreCallbackContext>.fromOpaque(context).takeUnretainedValue()
         // Added-display state is valid here. Removed-display queries can fail,
         // so their classification is taken from the main-thread identity cache.
-        let addedIsStudio: Bool? = flags.contains(.addFlag) && CGDisplayIsOnline(displayID) != 0
+        let addedIsStudio: Bool? =
+            flags.contains(.addFlag) && CGDisplayIsOnline(displayID) != 0
             ? (CGDisplayVendorNumber(displayID) == 0x4844 && CGDisplayModelNumber(displayID) == 0x5354) : nil
         DispatchQueue.main.async { [weak owner = registration.owner] in
             owner?.connectionChanged(displayID: displayID, flags: flags, addedIsStudio: addedIsStudio)
@@ -132,29 +143,42 @@ final class AutoRestoreManager: ObservableObject {
         registerConnectionCallback()
         // Merely launching the application never applies a stored configuration.
         profileSubscription = layouts.$profiles.sink { [weak self] in self?.profilesChanged($0) }
-        screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
-                                                                object: nil, queue: .main) { [weak self] _ in
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
             self?.screenParametersChanged()
         }
         let center = NSWorkspace.shared.notificationCenter
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.systemSleeping = true; self?.cancelPending()
-        })
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.screensSleeping = true; self?.cancelPending()
-        })
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.systemSleeping = false; self?.woke()
-        })
-        workspaceObservers.append(center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.screensSleeping = false; self?.woke()
-        })
+        workspaceObservers.append(
+            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.systemSleeping = true
+                self?.cancelPending()
+            })
+        workspaceObservers.append(
+            center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                self?.screensSleeping = true
+                self?.cancelPending()
+            })
+        workspaceObservers.append(
+            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                self?.systemSleeping = false
+                self?.woke()
+            })
+        workspaceObservers.append(
+            center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                self?.screensSleeping = false
+                self?.woke()
+            })
     }
 
     func setEnabled(_ value: Bool) {
         guard !shuttingDown else { return }
         guard !value || selectedProfileID != nil else {
-            error = "请先选择一个已保存的显示配置。"; return
+            error = "请先选择一个已保存的显示配置。"
+            return
         }
         enabled = value
         defaults.set(value, forKey: enabledKey)
@@ -166,11 +190,17 @@ final class AutoRestoreManager: ObservableObject {
     func setSelectedProfile(_ id: UUID?) {
         guard !shuttingDown else { return }
         if let id, let layouts, !layouts.profiles.contains(where: { $0.id == id }) {
-            error = "所选配置已被删除，请重新选择。"; return
+            error = "所选配置已被删除，请重新选择。"
+            return
         }
         selectedProfileID = id
-        if let id { defaults.set(id.uuidString, forKey: profileKey) }
-        else { defaults.removeObject(forKey: profileKey); enabled = false; defaults.set(false, forKey: enabledKey) }
+        if let id {
+            defaults.set(id.uuidString, forKey: profileKey)
+        } else {
+            defaults.removeObject(forKey: profileKey)
+            enabled = false
+            defaults.set(false, forKey: enabledKey)
+        }
         cancelPending()
         error = nil
         message = enabled ? "预设已更新，下次唤醒或重新连接时生效。" : "选择预设后可开启自动恢复。"
@@ -222,8 +252,9 @@ final class AutoRestoreManager: ObservableObject {
     private func registerConnectionCallback() {
         let context = Unmanaged.passRetained(AutoRestoreCallbackContext(owner: self)).toOpaque()
         let status = CGDisplayRegisterReconfigurationCallback(Self.reconfigurationCallback, context)
-        if status == .success { callbackContext = context }
-        else {
+        if status == .success {
+            callbackContext = context
+        } else {
             Unmanaged<AutoRestoreCallbackContext>.fromOpaque(context).release()
             error = "无法注册显示器连接事件（\(status.rawValue)）。可尝试重新打开应用。"
         }
@@ -255,15 +286,21 @@ final class AutoRestoreManager: ObservableObject {
         }
     }
 
-    private func connectionChanged(displayID: CGDirectDisplayID, flags: CGDisplayChangeSummaryFlags, addedIsStudio: Bool?) {
+    private func connectionChanged(
+        displayID: CGDirectDisplayID, flags: CGDisplayChangeSummaryFlags, addedIsStudio: Bool?
+    ) {
         guard !shuttingDown else { return }
         let isStudio = addedIsStudio ?? knownStudioVirtual[displayID]
         if let addedIsStudio { remember(displayID, isStudioVirtual: addedIsStudio) }
         guard let isStudio,
-              AutoRestoreEventPolicy.isPhysicalConnectionEvent(flags, isStudioVirtual: isStudio) else { return }
+            AutoRestoreEventPolicy.isPhysicalConnectionEvent(flags, isStudioVirtual: isStudio)
+        else { return }
         rememberCurrentDisplays()
         _ = policy.observe(.current(), at: Date())
-        guard enabled, !systemSleeping, !screensSleeping else { cancelPending(); return }
+        guard enabled, !systemSleeping, !screensSleeping else {
+            cancelPending()
+            return
+        }
         // Preserve manually initiated work. An actual connection change during
         // our own restore instead cancels that transaction and settles anew.
         if !isBusy && (isBlocked() || layouts?.isBusy == true || layouts?.isPending == true) {
@@ -287,7 +324,10 @@ final class AutoRestoreManager: ObservableObject {
 
     private func scheduleCurrentRequest() {
         work?.cancel()
-        guard enabled, let request = policy.request, selectedProfileID != nil else { cancelPending(); return }
+        guard enabled, let request = policy.request, selectedProfileID != nil else {
+            cancelPending()
+            return
+        }
         isWaiting = true
         let generation = request.generation
         let item = DispatchWorkItem { [weak self] in self?.attempt(generation: generation) }
@@ -297,13 +337,15 @@ final class AutoRestoreManager: ObservableObject {
 
     private func attempt(generation: UInt64) {
         guard enabled, !shuttingDown, !systemSleeping, !screensSleeping,
-              let layouts, let profileID = selectedProfileID,
-              policy.consumeAttempt(generation: generation, at: Date()) else {
+            let layouts, let profileID = selectedProfileID,
+            policy.consumeAttempt(generation: generation, at: Date())
+        else {
             if policy.request?.generation == generation { cancelPending() }
             return
         }
         guard let profile = layouts.profiles.first(where: { $0.id == profileID }) else {
-            profilesChanged(layouts.profiles); return
+            profilesChanged(layouts.profiles)
+            return
         }
         if isBusy || isBlocked() || layouts.isBusy || layouts.isPending {
             retryOrFinish(generation, message: "本次自动恢复已跳过，其他显示设置仍在进行。")
@@ -326,7 +368,9 @@ final class AutoRestoreManager: ObservableObject {
             guard let self else { return }
             defer {
                 if self.activeRestoreID == restoreID {
-                    self.activeRestoreID = nil; self.restoreTask = nil; self.isBusy = false
+                    self.activeRestoreID = nil
+                    self.restoreTask = nil
+                    self.isBusy = false
                 }
             }
             do {
@@ -347,19 +391,26 @@ final class AutoRestoreManager: ObservableObject {
                 }
             }
             if self.policy.request?.generation == generation {
-                self.work?.cancel(); self.work = nil
-                self.policy.cancel(); self.isWaiting = false
+                self.work?.cancel()
+                self.work = nil
+                self.policy.cancel()
+                self.isWaiting = false
             }
         }
     }
 
     private func retryOrFinish(_ generation: UInt64, message: String) {
-        if policy.canRetry(generation: generation, at: Date()) { scheduleCurrentRequest() }
-        else { cancelPending(); self.message = message }
+        if policy.canRetry(generation: generation, at: Date()) {
+            scheduleCurrentRequest()
+        } else {
+            cancelPending()
+            self.message = message
+        }
     }
 
     private func cancelPending() {
-        work?.cancel(); work = nil
+        work?.cancel()
+        work = nil
         restoreTask?.cancel()
         policy.cancel()
         isWaiting = false
@@ -369,10 +420,14 @@ final class AutoRestoreManager: ObservableObject {
         shuttingDown = true
         cancelPending()
         unregisterConnectionCallback()
-        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver); self.screenObserver = nil }
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+            self.screenObserver = nil
+        }
         workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         workspaceObservers.removeAll()
-        profileSubscription?.cancel(); profileSubscription = nil
+        profileSubscription?.cancel()
+        profileSubscription = nil
     }
     func waitForShutdown() async {
         if let restoreTask { await restoreTask.value }
@@ -412,6 +467,7 @@ struct AutoRestoreView: View {
                 Text(manager.message).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9))
+        }.padding(16).background(
+            Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }

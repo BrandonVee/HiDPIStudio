@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import CoreMedia
 import ScreenCaptureKit
 import SwiftUI
@@ -22,11 +22,18 @@ final class ScreenPreviewController: ObservableObject {
     /// access at startup, while enumerating displays, or during automatic tests.
     @MainActor func start(displayID: CGDirectDisplayID, name: String) async {
         guard !isShuttingDown, !startingIDs.contains(displayID) else { return }
-        if let existing = sessions[displayID] { existing.window.makeKeyAndOrderFront(nil); return }
+        if let existing = sessions[displayID] {
+            existing.window.makeKeyAndOrderFront(nil)
+            return
+        }
         error = nil
-        guard sessions.count + startingIDs.count < 4 else { error = "最多同时打开 4 个屏幕预览。"; return }
+        guard sessions.count + startingIDs.count < 4 else {
+            error = "最多同时打开 4 个屏幕预览。"
+            return
+        }
         guard DisplayCore.onlineIDs().contains(displayID), let identity = DisplayIdentity.capture(displayID) else {
-            error = "显示器已断开，请刷新后重试。"; return
+            error = "显示器已断开，请刷新后重试。"
+            return
         }
         guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
             error = "屏幕预览需要“屏幕与系统音频录制”权限。请在系统设置中允许 HiDPI Studio；授权后可能需要重新打开应用。"
@@ -45,8 +52,8 @@ final class ScreenPreviewController: ObservableObject {
                 throw DisplayFailure(message: "该屏幕当前不可捕获，可能已断开或处于镜像从屏状态。")
             }
             let ownApplications = content.applications.filter {
-                $0.processID == ProcessInfo.processInfo.processIdentifier ||
-                    (Bundle.main.bundleIdentifier != nil && $0.bundleIdentifier == Bundle.main.bundleIdentifier)
+                $0.processID == ProcessInfo.processInfo.processIdentifier
+                    || (Bundle.main.bundleIdentifier != nil && $0.bundleIdentifier == Bundle.main.bundleIdentifier)
             }
             let filter = SCContentFilter(display: display, excludingApplications: ownApplications, exceptingWindows: [])
             let config = SCStreamConfiguration()
@@ -84,7 +91,8 @@ final class ScreenPreviewController: ObservableObject {
             session.watchdog = Task { @MainActor [weak self, weak session] in
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
                 guard !Task.isCancelled, let self, let session,
-                      self.generations[displayID] == generation, !session.receivedFrame else { return }
+                    self.generations[displayID] == generation, !session.receivedFrame
+                else { return }
                 self.error = "未收到有效预览画面。请检查录屏权限及屏幕连接，然后重试。"
                 await self.stop(displayID: displayID)
             }
@@ -116,7 +124,9 @@ final class ScreenPreviewController: ObservableObject {
 
     func refreshScreens() {
         let online = Set(DisplayCore.onlineIDs())
-        let missing = Set(sessions.keys).union(startingIDs).filter { !online.contains($0) || identities[$0]?.matches($0) != true }
+        let missing = Set(sessions.keys).union(startingIDs).filter {
+            !online.contains($0) || identities[$0]?.matches($0) != true
+        }
         for id in missing { Task { @MainActor [weak self] in await self?.stop(displayID: id) } }
     }
 
@@ -144,7 +154,8 @@ private final class PreviewVideoView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layout() {
         super.layout()
-        CATransaction.begin(); CATransaction.setDisableActions(true)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         displayLayer.frame = bounds
         CATransaction.commit()
         waiting.frame = NSRect(x: 10, y: bounds.midY - 12, width: max(0, bounds.width - 20), height: 24)
@@ -152,7 +163,9 @@ private final class PreviewVideoView: NSView {
     func showFrame(_ buffer: CMSampleBuffer) -> Bool {
         if displayLayer.status == .failed { displayLayer.flush() }
         guard displayLayer.isReadyForMoreMediaData else { return false }
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: true) as? [NSMutableDictionary] {
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: true)
+            as? [NSMutableDictionary]
+        {
             attachments.first?[kCMSampleAttachmentKey_DisplayImmediately as String] = true
         }
         displayLayer.enqueue(buffer)
@@ -181,7 +194,9 @@ private final class PreviewSession: NSObject, SCStreamOutput, SCStreamDelegate, 
         let size = ScreenPreviewController.previewSize(width: width, height: height)
         let scale = min(720 / Double(size.width), 450 / Double(size.height))
         let rect = NSRect(x: 0, y: 0, width: Double(size.width) * scale, height: Double(size.height) * scale)
-        window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        window = NSWindow(
+            contentRect: rect, styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered,
+            defer: false)
         video = PreviewVideoView(frame: rect)
         super.init()
         window.title = "屏幕预览 · \(name) · 只读"
@@ -195,11 +210,15 @@ private final class PreviewSession: NSObject, SCStreamOutput, SCStreamDelegate, 
         window.center()
     }
     func windowWillClose(_ notification: Notification) { onClose?() }
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType) {
+    func stream(
+        _ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of outputType: SCStreamOutputType
+    ) {
         guard outputType == .screen, sampleBuffer.isValid else { return }
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
-           let rawStatus = attachments.first?[.status] as? Int,
-           let status = SCFrameStatus(rawValue: rawStatus) {
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
+            as? [[SCStreamFrameInfo: Any]],
+            let rawStatus = attachments.first?[.status] as? Int,
+            let status = SCFrameStatus(rawValue: rawStatus)
+        {
             switch status {
             case .blank, .suspended:
                 video.showPaused("屏幕画面已暂停，等待恢复…")
@@ -208,12 +227,13 @@ private final class PreviewSession: NSObject, SCStreamOutput, SCStreamDelegate, 
                 video.showPaused("屏幕预览已停止")
                 return
             case .complete: break
-            default: return // Idle/started notifications do not contain a new frame.
+            default: return  // Idle/started notifications do not contain a new frame.
             }
         }
         guard sampleBuffer.dataReadiness == .ready,
-              let pixels = CMSampleBufferGetImageBuffer(sampleBuffer),
-              CVPixelBufferGetWidth(pixels) > 0, CVPixelBufferGetHeight(pixels) > 0 else { return }
+            let pixels = CMSampleBufferGetImageBuffer(sampleBuffer),
+            CVPixelBufferGetWidth(pixels) > 0, CVPixelBufferGetHeight(pixels) > 0
+        else { return }
         if video.showFrame(sampleBuffer) { acceptedFrameCount += 1 }
     }
     func stream(_ stream: SCStream, didStopWithError error: Error) {
@@ -249,10 +269,14 @@ struct ScreenPreviewsView: View {
                         ProgressView().controlSize(.small)
                         Button("取消") { Task { @MainActor in await controller.stop(displayID: screen.id) } }
                     } else if controller.activeIDs.contains(screen.id) {
-                        Button("显示窗口") { Task { @MainActor in await controller.start(displayID: screen.id, name: screen.name) } }
+                        Button("显示窗口") {
+                            Task { @MainActor in await controller.start(displayID: screen.id, name: screen.name) }
+                        }
                         Button("停止预览") { Task { @MainActor in await controller.stop(displayID: screen.id) } }
                     } else {
-                        Button("预览") { Task { @MainActor in await controller.start(displayID: screen.id, name: screen.name) } }
+                        Button("预览") {
+                            Task { @MainActor in await controller.start(displayID: screen.id, name: screen.name) }
+                        }
                     }
                 }.padding(.vertical, 6)
             }

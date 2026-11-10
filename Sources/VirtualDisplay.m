@@ -23,27 +23,34 @@
 }
 + (BOOL)isAvailable {
     NSDictionary *requirements = @{
-        @"CGVirtualDisplay": @[@"initWithDescriptor:", @"applySettings:", @"displayID"],
-        @"CGVirtualDisplayDescriptor": @[@"setVendorID:", @"setProductID:", @"setSerialNum:",
-            @"setName:", @"setQueue:", @"setMaxPixelsWide:", @"setMaxPixelsHigh:",
-            @"setSizeInMillimeters:", @"setRedPrimary:", @"setGreenPrimary:",
-            @"setBluePrimary:", @"setWhitePoint:"],
-        @"CGVirtualDisplaySettings": @[@"setHiDPI:", @"setModes:"],
-        @"CGVirtualDisplayMode": @[@"initWithWidth:height:refreshRate:"]
+        @"CGVirtualDisplay" : @[ @"initWithDescriptor:", @"applySettings:", @"displayID" ],
+        @"CGVirtualDisplayDescriptor" : @[
+            @"setVendorID:", @"setProductID:", @"setSerialNum:", @"setName:", @"setQueue:", @"setMaxPixelsWide:",
+            @"setMaxPixelsHigh:", @"setSizeInMillimeters:", @"setRedPrimary:", @"setGreenPrimary:", @"setBluePrimary:",
+            @"setWhitePoint:"
+        ],
+        @"CGVirtualDisplaySettings" : @[ @"setHiDPI:", @"setModes:" ],
+        @"CGVirtualDisplayMode" : @[ @"initWithWidth:height:refreshRate:" ]
     };
     for (NSString *name in requirements) {
         Class cls = NSClassFromString(name);
-        if (!cls) return NO;
+        if (!cls)
+            return NO;
         for (NSString *selector in requirements[name]) {
-            if (![cls instancesRespondToSelector:NSSelectorFromString(selector)]) return NO;
+            if (![cls instancesRespondToSelector:NSSelectorFromString(selector)])
+                return NO;
         }
     }
     return YES;
 }
-- (instancetype)initWithWidth:(uint32_t)width height:(uint32_t)height
-                 refreshRate:(double)rate name:(NSString *)name error:(NSError **)error {
+- (instancetype)initWithWidth:(uint32_t)width
+                       height:(uint32_t)height
+                  refreshRate:(double)rate
+                         name:(NSString *)name
+                        error:(NSError **)error {
     self = [super init];
-    if (!self) return nil;
+    if (!self)
+        return nil;
     NSString *failure = nil;
     if (width < 640 || height < 480 || width > 3840 || height > 2160) {
         failure = @"虚拟屏幕尺寸需在 640 × 480 到 3840 × 2160 之间。";
@@ -75,12 +82,13 @@
             } else {
                 id settings = [[NSClassFromString(@"CGVirtualDisplaySettings") alloc] init];
                 [settings setHiDPI:1];
-                id mode = [[NSClassFromString(@"CGVirtualDisplayMode") alloc]
-                           initWithWidth:width height:height refreshRate:rate];
+                id mode = [[NSClassFromString(@"CGVirtualDisplayMode") alloc] initWithWidth:width
+                                                                                     height:height
+                                                                                refreshRate:rate];
                 if (!mode) {
                     failure = @"macOS 拒绝了虚拟 HiDPI 模式。";
                 } else {
-                    [settings setModes:@[mode]];
+                    [settings setModes:@[ mode ]];
                     if (![_display applySettings:settings])
                         failure = @"macOS 无法应用虚拟 HiDPI 设置。";
                 }
@@ -91,12 +99,16 @@
     }
     if (failure) {
         _display = nil;
-        if (error) *error = [NSError errorWithDomain:@"HiDPIStudio" code:1
-                                          userInfo:@{NSLocalizedDescriptionKey:failure}];
+        if (error)
+            *error = [NSError errorWithDomain:@"HiDPIStudio" code:1 userInfo:@{NSLocalizedDescriptionKey : failure}];
         return nil;
     }
     return self;
 }
-- (CGDirectDisplayID)displayID { return _display ? [_display displayID] : 0; }
-- (void)disconnect { _display = nil; }
+- (CGDirectDisplayID)displayID {
+    return _display ? [_display displayID] : 0;
+}
+- (void)disconnect {
+    _display = nil;
+}
 @end

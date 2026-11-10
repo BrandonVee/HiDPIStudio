@@ -1,5 +1,5 @@
-import Foundation
 import CoreGraphics
+import Foundation
 
 enum BrightnessControlBackend: String, Codable {
     case system, ddc
@@ -9,9 +9,15 @@ enum BrightnessControlBackend: String, Codable {
 private final class DDCCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
-    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
     func check() throws {
-        lock.lock(); let value = cancelled; lock.unlock()
+        lock.lock()
+        let value = cancelled
+        lock.unlock()
         if value { throw CancellationError() }
     }
 }
@@ -37,7 +43,9 @@ final class DDCBrightnessService {
         }
     }
 
-    func set(_ normalized: Double, displayID: CGDirectDisplayID, identity: DisplayIdentity) async throws -> NativeBrightnessReading {
+    func set(_ normalized: Double, displayID: CGDirectDisplayID, identity: DisplayIdentity) async throws
+        -> NativeBrightnessReading
+    {
         _ = try NativeBrightnessService.validated(normalized)
         return try await perform { token in
             try self.checkIdentity(displayID, identity, token)
@@ -59,13 +67,19 @@ final class DDCBrightnessService {
                     return self.reading(displayID, identity, last)
                 }
             }
-            throw DisplayFailure(message: "显示器实际返回亮度 \(last.current)/\(last.maximum)，未采用请求的 \(requested)/\(before.maximum)。请检查 HDR、动态对比度或显示器亮度锁定。")
+            throw DisplayFailure(
+                message:
+                    "显示器实际返回亮度 \(last.current)/\(last.maximum)，未采用请求的 \(requested)/\(before.maximum)。请检查 HDR、动态对比度或显示器亮度锁定。"
+            )
         }
     }
 
-    private func reading(_ id: CGDirectDisplayID, _ identity: DisplayIdentity, _ value: DDCBrightnessValue) -> NativeBrightnessReading {
-        NativeBrightnessReading(displayID: id, identity: identity, value: value.normalized,
-                                backend: .ddc, rawCurrent: value.current, rawMaximum: value.maximum)
+    private func reading(_ id: CGDirectDisplayID, _ identity: DisplayIdentity, _ value: DDCBrightnessValue)
+        -> NativeBrightnessReading
+    {
+        NativeBrightnessReading(
+            displayID: id, identity: identity, value: value.normalized,
+            backend: .ddc, rawCurrent: value.current, rawMaximum: value.maximum)
     }
     private func checkIdentity(_ id: CGDirectDisplayID, _ identity: DisplayIdentity, _ token: DDCCancellation) throws {
         try token.check()
@@ -73,11 +87,15 @@ final class DDCBrightnessService {
             throw DisplayFailure(message: "外接屏已断开或身份变化，已取消 DDC 操作。")
         }
     }
-    private func readValue(_ transport: HDAppleDDC, identity: DisplayIdentity, token: DDCCancellation) throws -> DDCBrightnessValue {
+    private func readValue(_ transport: HDAppleDDC, identity: DisplayIdentity, token: DDCCancellation) throws
+        -> DDCBrightnessValue
+    {
         let key = identity.uuid + "/" + String(transport.registryEntryID)
         let canonical = ReadConfiguration(includesSource: true, offset: 0)
-        var choices = [canonical, ReadConfiguration(includesSource: true, offset: 0x51),
-                       ReadConfiguration(includesSource: false, offset: 0), ReadConfiguration(includesSource: false, offset: 0x51)]
+        var choices = [
+            canonical, ReadConfiguration(includesSource: true, offset: 0x51),
+            ReadConfiguration(includesSource: false, offset: 0), ReadConfiguration(includesSource: false, offset: 0x51),
+        ]
         if let preferred = preferredReads[key] {
             choices.removeAll { $0.includesSource == preferred.includesSource && $0.offset == preferred.offset }
             choices.insert(preferred, at: 0)
@@ -86,31 +104,36 @@ final class DDCBrightnessService {
         for configuration in choices {
             try checkIdentity(transport.displayID, identity, token)
             do {
-                let request = DDCBrightnessPacket.getRequest(includeSourceInChecksum: configuration.includesSource,
-                                                           chipAddress: UInt8(transport.chipAddress))
+                let request = DDCBrightnessPacket.getRequest(
+                    includeSourceInChecksum: configuration.includesSource,
+                    chipAddress: UInt8(transport.chipAddress))
                 let reply = try transport.readBrightnessReply(Data(request), readOffset: configuration.offset)
                 try checkIdentity(transport.displayID, identity, token)
                 let result = try DDCBrightnessPacket.parseReply(Array(reply))
                 if preferredReads.count > 32 { preferredReads.removeAll() }
                 preferredReads[key] = configuration
                 return result
-            } catch DDCProtocolError.unsupportedBrightness { throw DDCProtocolError.unsupportedBrightness }
-            catch is CancellationError { throw CancellationError() }
-            catch { lastError = error }
+            } catch DDCProtocolError.unsupportedBrightness {
+                throw DDCProtocolError.unsupportedBrightness
+            } catch is CancellationError { throw CancellationError() } catch { lastError = error }
         }
-        throw DisplayFailure(message: "DDC 亮度读取失败：\(lastError.localizedDescription) 请确认显示器菜单中 DDC/CI 已开启，且连接线或扩展坞支持 DDC。")
+        throw DisplayFailure(
+            message: "DDC 亮度读取失败：\(lastError.localizedDescription) 请确认显示器菜单中 DDC/CI 已开启，且连接线或扩展坞支持 DDC。")
     }
     private func perform<T>(_ work: @escaping (DDCCancellation) throws -> T) async throws -> T {
         let token = DDCCancellation()
-        return try await withTaskCancellationHandler(operation: {
-            try Task.checkCancellation()
-            return try await withCheckedThrowingContinuation { continuation in
-                queue.async {
-                    do { try token.check(); continuation.resume(returning: try work(token)) }
-                    catch { continuation.resume(throwing: error) }
+        return try await withTaskCancellationHandler(
+            operation: {
+                try Task.checkCancellation()
+                return try await withCheckedThrowingContinuation { continuation in
+                    queue.async {
+                        do {
+                            try token.check()
+                            continuation.resume(returning: try work(token))
+                        } catch { continuation.resume(throwing: error) }
+                    }
                 }
-            }
-        }, onCancel: { token.cancel() })
+            }, onCancel: { token.cancel() })
     }
 }
 
@@ -119,20 +142,23 @@ final class DDCBrightnessService {
 enum HardwareBrightness {
     static func read(displayID: CGDirectDisplayID) async throws -> NativeBrightnessReading {
         try Task.checkCancellation()
-        do { return try NativeBrightnessService.shared.read(displayID: displayID) }
-        catch {
+        do { return try NativeBrightnessService.shared.read(displayID: displayID) } catch {
             guard CGDisplayIsBuiltin(displayID) == 0, let identity = DisplayIdentity.capture(displayID),
-                  !(CGDisplayVendorNumber(displayID) == 0x4844 && CGDisplayModelNumber(displayID) == 0x5354) else { throw error }
+                !(CGDisplayVendorNumber(displayID) == 0x4844 && CGDisplayModelNumber(displayID) == 0x5354)
+            else { throw error }
             return try await DDCBrightnessService.shared.read(displayID: displayID, identity: identity)
         }
     }
-    @MainActor static func set(_ value: Double, displayID: CGDirectDisplayID, expectedIdentity: DisplayIdentity) async throws -> NativeBrightnessReading {
+    @MainActor static func set(_ value: Double, displayID: CGDirectDisplayID, expectedIdentity: DisplayIdentity)
+        async throws -> NativeBrightnessReading
+    {
         _ = try NativeBrightnessService.validated(value)
         let reading = try await read(displayID: displayID)
         guard reading.identity == expectedIdentity else { throw DisplayFailure(message: "显示器已变化，已取消亮度调整。") }
         switch reading.backend {
         case .system:
-            return try await NativeBrightnessService.shared.set(value, displayID: displayID, expectedIdentity: expectedIdentity)
+            return try await NativeBrightnessService.shared.set(
+                value, displayID: displayID, expectedIdentity: expectedIdentity)
         case .ddc:
             return try await DDCBrightnessService.shared.set(value, displayID: displayID, identity: expectedIdentity)
         }

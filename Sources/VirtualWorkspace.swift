@@ -14,8 +14,11 @@ struct VirtualScreenDefinition: Identifiable, Codable, Equatable {
         guard !cleaned.isEmpty, cleaned.count <= 60 else { throw DisplayFailure(message: "名称需为 1–60 个字符。") }
         _ = try CustomSize(width: width, height: height)
         _ = try CustomRefreshRate(value: refreshRate)
-        self.id = id; self.name = cleaned
-        self.width = width; self.height = height; self.refreshRate = refreshRate
+        self.id = id
+        self.name = cleaned
+        self.width = width
+        self.height = height
+        self.refreshRate = refreshRate
     }
     var description: String {
         let rate = String(format: abs(refreshRate.rounded() - refreshRate) < 0.005 ? "%.0f" : "%.2f", refreshRate)
@@ -45,7 +48,10 @@ final class VirtualWorkspace: ObservableObject {
 
     var hasConnectedScreens: Bool { !handles.isEmpty || !displayIDs.isEmpty }
     func isDisconnecting(_ id: UUID) -> Bool { displayIDs[id] != nil && handles[id] == nil }
-    var canCreate: Bool { HDVirtualDisplay.isAvailable() && definitions.count < Self.maximumDefinitions && !isBusy && !isBlocked() && !isShuttingDown }
+    var canCreate: Bool {
+        HDVirtualDisplay.isAvailable() && definitions.count < Self.maximumDefinitions && !isBusy && !isBlocked()
+            && !isShuttingDown
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -60,14 +66,18 @@ final class VirtualWorkspace: ObservableObject {
             } catch { self.error = "无法读取已保存的虚拟屏幕：\(error.localizedDescription)" }
         }
         refreshScreens()
-        observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+        observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
             self?.refreshScreens()
         }
     }
 
     /// Save a definition without creating a desktop. Used by imports/tests and
     /// followed explicitly by connect when the user chooses Create and Connect.
-    @discardableResult func addDefinition(name: String, width: Int, height: Int, refreshRate: Double) throws -> VirtualScreenDefinition {
+    @discardableResult func addDefinition(name: String, width: Int, height: Int, refreshRate: Double) throws
+        -> VirtualScreenDefinition
+    {
         guard !isShuttingDown, !isBlocked(), !isBusy else { throw DisplayFailure(message: "请先结束正在进行的显示设置。") }
         guard definitions.count < Self.maximumDefinitions else { throw DisplayFailure(message: "最多保存 8 个虚拟屏幕定义。") }
         let definition = try VirtualScreenDefinition(name: name, width: width, height: height, refreshRate: refreshRate)
@@ -88,16 +98,24 @@ final class VirtualWorkspace: ObservableObject {
 
     @MainActor func connect(_ id: UUID) async {
         guard !isShuttingDown, !isBusy, !isBlocked(), handles[id] == nil, displayIDs[id] == nil,
-              let definition = definitions.first(where: { $0.id == id }) else { return }
+            let definition = definitions.first(where: { $0.id == id })
+        else { return }
         isBusy = true
         generation += 1
         let operation = generation
-        error = nil; connectionErrors[id] = nil
-        defer { if generation == operation { isBusy = false; refreshScreens() } }
+        error = nil
+        connectionErrors[id] = nil
+        defer {
+            if generation == operation {
+                isBusy = false
+                refreshScreens()
+            }
+        }
         do {
             try definition.validate()
-            let virtual = try HDVirtualDisplay(width: UInt32(definition.width), height: UInt32(definition.height), refreshRate: definition.refreshRate,
-                                               name: "HiDPI Studio · " + definition.name)
+            let virtual = try HDVirtualDisplay(
+                width: UInt32(definition.width), height: UInt32(definition.height), refreshRate: definition.refreshRate,
+                name: "HiDPI Studio · " + definition.name)
             handles[id] = virtual
             let displayID = virtual.displayID
             guard displayID != 0 else { throw DisplayFailure(message: "系统没有返回有效的虚拟屏幕。") }
@@ -105,7 +123,9 @@ final class VirtualWorkspace: ObservableObject {
             let mode = try await DisplayCore.waitForHiDPI(displayID, size: size, refreshRate: definition.refreshRate)
             guard operation == generation, !isShuttingDown else { return }
             try DisplayCore.setMode(displayID, mode)
-            try DisplayCore.verify(displayID, width: definition.width, height: definition.height, hiDPI: true, refreshRate: definition.refreshRate)
+            try DisplayCore.verify(
+                displayID, width: definition.width, height: definition.height, hiDPI: true,
+                refreshRate: definition.refreshRate)
             displayIDs[id] = displayID
             identities[id] = DisplayIdentity.capture(displayID)
             refreshScreens()
@@ -132,7 +152,10 @@ final class VirtualWorkspace: ObservableObject {
         guard !isBusy, !isBlocked(), !isShuttingDown else { return }
         isBusy = true
         error = nil
-        defer { isBusy = false; refreshScreens() }
+        defer {
+            isBusy = false
+            refreshScreens()
+        }
         guard await disconnectInternal(id) else { return }
         do {
             let next = definitions.filter { $0.id != id }
@@ -150,7 +173,8 @@ final class VirtualWorkspace: ObservableObject {
     @MainActor private func disconnectInternal(_ id: UUID) async -> Bool {
         guard let displayID = displayIDs[id] ?? handles[id]?.displayID, displayID != 0 else {
             handles.removeValue(forKey: id)?.disconnect()
-            displayIDs[id] = nil; identities[id] = nil
+            displayIDs[id] = nil
+            identities[id] = nil
             return true
         }
         let identity = identities[id] ?? DisplayIdentity.capture(displayID)
@@ -162,7 +186,9 @@ final class VirtualWorkspace: ObservableObject {
         displayIDs[id] = displayID
         for _ in 0..<30 {
             if !DisplayCore.onlineIDs().contains(displayID) || identity.map({ !$0.matches(displayID) }) == true {
-                displayIDs[id] = nil; identities[id] = nil; connectionErrors[id] = nil
+                displayIDs[id] = nil
+                identities[id] = nil
+                connectionErrors[id] = nil
                 return true
             }
             try? await Task.sleep(nanoseconds: 100_000_000)
@@ -176,10 +202,12 @@ final class VirtualWorkspace: ObservableObject {
     func refreshScreens() {
         let online = Set(DisplayCore.onlineIDs())
         if !isBusy {
-            for (id, displayID) in Array(displayIDs) where !online.contains(displayID) || identities[id].map({ !$0.matches(displayID) }) == true {
+            for (id, displayID) in Array(displayIDs)
+            where !online.contains(displayID) || identities[id].map({ !$0.matches(displayID) }) == true {
                 let wasDisconnecting = handles[id] == nil
                 handles.removeValue(forKey: id)?.disconnect()
-                displayIDs[id] = nil; identities[id] = nil
+                displayIDs[id] = nil
+                identities[id] = nil
                 connectionErrors[id] = wasDisconnecting ? nil : "虚拟屏幕已被系统断开，可点击连接重试。"
             }
             if error == Self.pendingRemovalMessage && !displayIDs.keys.contains(where: isDisconnecting) { error = nil }
@@ -222,14 +250,16 @@ struct VirtualWorkspaceView: View {
                     Spacer(minLength: 0)
                     Button("创建并连接") {
                         guard let w = Int(width), let h = Int(height), let rate = Double(refreshRate) else {
-                            manager.error = "请输入整数宽高和有效刷新率。"; return
+                            manager.error = "请输入整数宽高和有效刷新率。"
+                            return
                         }
                         Task { @MainActor in await manager.create(name: name, width: w, height: h, refreshRate: rate) }
                     }.disabled(blocked || !manager.canCreate)
                 }
                 Text("保存最多 8 个定义；实际可连接数量取决于 Mac。退出会移除虚拟桌面，下次打开可手动连接。")
                     .font(.caption).foregroundStyle(.secondary)
-            }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9))
+            }.padding(16).background(
+                Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("我的虚拟屏幕").font(.system(size: 15, weight: .semibold))
@@ -252,7 +282,8 @@ struct VirtualWorkspaceView: View {
     private func field(_ title: String, text: Binding<String>, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            TextField(title, text: text).textFieldStyle(.roundedBorder).frame(width: width).accessibilityLabel("虚拟屏幕" + title)
+            TextField(title, text: text).textFieldStyle(.roundedBorder).frame(width: width).accessibilityLabel(
+                "虚拟屏幕" + title)
         }
     }
 
@@ -266,10 +297,15 @@ struct VirtualWorkspaceView: View {
                     HStack(spacing: 8) {
                         Text(definition.name).font(.system(size: 13, weight: .medium))
                         Text(manager.isDisconnecting(definition.id) ? "正在断开" : (displayID == nil ? "未连接" : "已连接"))
-                            .font(.caption).foregroundStyle(manager.isDisconnecting(definition.id) ? Color.orange : (displayID == nil ? Color.secondary : Color.green))
+                            .font(.caption).foregroundStyle(
+                                manager.isDisconnecting(definition.id)
+                                    ? Color.orange : (displayID == nil ? Color.secondary : Color.green))
                     }
-                    Text(actual.map { $0.sizeLabel + " HiDPI · " + $0.rateLabel + " · 渲染 " + $0.backingLabel } ?? definition.description)
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    Text(
+                        actual.map { $0.sizeLabel + " HiDPI · " + $0.rateLabel + " · 渲染 " + $0.backingLabel }
+                            ?? definition.description
+                    )
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer(minLength: 8)
                 if displayID != nil {
@@ -279,7 +315,10 @@ struct VirtualWorkspaceView: View {
                 }
                 Button("移除") { Task { @MainActor in await manager.remove(definition.id) } }
             }.disabled(blocked)
-            if let error = manager.connectionErrors[definition.id] { Text(error).font(.caption).foregroundStyle(.orange) }
-        }.padding(12).background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 8))
+            if let error = manager.connectionErrors[definition.id] {
+                Text(error).font(.caption).foregroundStyle(.orange)
+            }
+        }.padding(12).background(
+            Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

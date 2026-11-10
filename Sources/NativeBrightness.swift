@@ -1,6 +1,6 @@
 import CoreGraphics
-import Foundation
 import Darwin
+import Foundation
 
 struct NativeBrightnessReading {
     let displayID: CGDirectDisplayID
@@ -24,10 +24,15 @@ final class NativeBrightnessService {
     private let setter: Setter?
 
     private init() {
-        let library = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY | RTLD_LOCAL)
+        let library = dlopen(
+            "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY | RTLD_LOCAL)
         handle = library
-        getter = library.flatMap { dlsym($0, "DisplayServicesGetBrightness") }.map { unsafeBitCast($0, to: Getter.self) }
-        setter = library.flatMap { dlsym($0, "DisplayServicesSetBrightness") }.map { unsafeBitCast($0, to: Setter.self) }
+        getter = library.flatMap { dlsym($0, "DisplayServicesGetBrightness") }.map {
+            unsafeBitCast($0, to: Getter.self)
+        }
+        setter = library.flatMap { dlsym($0, "DisplayServicesSetBrightness") }.map {
+            unsafeBitCast($0, to: Setter.self)
+        }
     }
 
     static func validated(_ value: Double) throws -> Double {
@@ -37,7 +42,8 @@ final class NativeBrightnessService {
         return value
     }
     static func matches(_ actual: Double, _ requested: Double) -> Bool {
-        actual.isFinite && requested.isFinite && (0...1).contains(actual) && (0...1).contains(requested) && abs(actual - requested) <= 0.005
+        actual.isFinite && requested.isFinite && (0...1).contains(actual) && (0...1).contains(requested)
+            && abs(actual - requested) <= 0.005
     }
 
     func read(displayID: CGDirectDisplayID) throws -> NativeBrightnessReading {
@@ -60,8 +66,10 @@ final class NativeBrightnessService {
 
     /// The caller explicitly requested a system setting change. Do not restore
     /// this value on app exit. Only return success after reading the applied value.
-    @MainActor func set(_ requested: Double, displayID: CGDirectDisplayID,
-                        expectedIdentity: DisplayIdentity) async throws -> NativeBrightnessReading {
+    @MainActor func set(
+        _ requested: Double, displayID: CGDirectDisplayID,
+        expectedIdentity: DisplayIdentity
+    ) async throws -> NativeBrightnessReading {
         let value = try Self.validated(requested)
         try Task.checkCancellation()
         let before = try read(displayID: displayID)

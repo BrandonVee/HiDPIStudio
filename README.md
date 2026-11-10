@@ -6,7 +6,7 @@
 
 ## 下载与运行
 
-从 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 下载 `HiDPIStudio-v2.3.0-macOS-arm64.zip`，解压后打开 **HiDPI Studio.app**。首次公开版本为预览版。
+从 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 下载 `HiDPIStudio-v2.4.0-macOS-arm64.zip`，解压后打开 **HiDPI Studio.app**。当前版本为预览版。
 
 - 发布的应用包适用于 **Apple Silicon**。构建目标为 macOS 13+，实际测试环境为 macOS 26.4 / Apple M5 Pro。
 - 应用采用本地 ad-hoc 签名，**未经 Developer ID 签名或 Apple 公证**。下载后 macOS 可能阻止直接打开；请按系统“隐私与安全性”提示操作。
@@ -29,6 +29,8 @@
 | 原生亮度键 | F1/F2 系统亮度事件控制鼠标所在的受支持屏幕；默认关闭。 |
 
 显示模式和布局采用 15 秒试用确认。确认的原生设置退出后继续生效；虚拟屏幕和镜像需要应用运行。关闭窗口仍在菜单栏运行。
+
+单击菜单栏图标可打开显示控制中心：查看当前屏幕与分辨率、调节硬件亮度和软件滤镜、调用收藏与布局预设，以及开关亮度联动和唤醒恢复。右键图标保留原生快捷菜单。分辨率与布局变更仍需在主窗口完成试用确认。
 
 亮度联动和自动恢复位于“联动与恢复”，F1/F2 位于“快捷键”。自动恢复需要先在“布局与预设”保存配置。
 
@@ -54,16 +56,35 @@ open '.build/HiDPI Studio.app'
 
 脚本按当前 Mac 架构构建。发布包为 arm64，其他架构未验证。
 
+## 自动构建与发布
+
+GitHub Actions 在推送 `main`、提交 PR 或手动触发时构建 ARM64 应用，运行隔离检查并提供 ZIP 与 SHA256 下载；推送 `v*` 版本标签后，检查通过才会自动发布预览版 Release。版本标签必须与 `Resources/Info.plist` 中的三段版本号一致。
+
+```bash
+# 本地执行与 CI 相同的构建、检查、签名验证及 ZIP 打包
+./scripts/package.sh
+
+# 提交并创建版本标签后，先备份 GitLab，再推送 GitHub
+# 示例标签；每次发布请使用尚未发布的新版本号
+git publish --tag v2.4.0
+```
+
+发布产物为 `dist/HiDPIStudio-v<版本>-macOS-arm64.zip` 和对应的 SHA256 文件。构建日志与分支安装包在 [Actions](https://github.com/BrandonVee/HiDPIStudio/actions) 查看，标签版本在 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 下载。
+
+完整发布步骤、重试与签名范围见 [发布流程](docs/RELEASING.md)。
+
 ## 验证
 
 以下检查不会主动写入物理显示器亮度或分辨率：
 
 ```bash
 APP='.build/HiDPI Studio.app/Contents/MacOS/HiDPIStudio'
-"$APP" --test-features --test-ddc --test-automation
+"$APP" --test-ci
 "$APP" --diagnose
 "$APP" --brightness-read
 ```
+
+`--test-ci` 运行隔离偏好与模拟 I/O 检查，不切换实体显示模式、不写入硬件亮度、不创建虚拟屏幕，也不请求录屏或辅助功能权限。
 
 `--test-automation` 的物理配置检查仅验证当前配置无需改变。使用隔离偏好，不会开启用户的自动化设置。
 
@@ -79,7 +100,7 @@ APP='.build/HiDPI Studio.app/Contents/MacOS/HiDPIStudio'
 - `VirtualWorkspace.swift` / `ScreenPreview.swift`：虚拟桌面及画中画。
 - `LayoutProfiles.swift` / `AutoRestore.swift`：布局预设与唤醒/重连恢复。
 - `BrightnessSync.swift` / `NativeBrightnessKeys.swift`：亮度联动与原生亮度键。
-- `StudioView.swift` / `AppDelegate.swift`：原生界面、菜单栏及生命周期。
+- `StudioView.swift` / `StatusPanel.swift` / `AppDelegate.swift`：主窗口、菜单栏控制中心及生命周期。
 
 ## 实现参考
 

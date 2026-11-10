@@ -76,8 +76,8 @@ enum DDCBrightnessPacket {
     }
 
     static func parseReply(_ bytes: [UInt8]) throws -> DDCBrightnessValue {
-        if bytes.isEmpty || bytes.allSatisfy({ $0 == 0 }) ||
-            (bytes.count >= 2 && bytes[0] == 0x6e && bytes[1] == 0x80) {
+        if bytes.isEmpty || bytes.allSatisfy({ $0 == 0 }) || (bytes.count >= 2 && bytes[0] == 0x6e && bytes[1] == 0x80)
+        {
             throw DDCProtocolError.noReply
         }
         guard bytes.count == 11 else { throw DDCProtocolError.invalidLength(bytes.count) }

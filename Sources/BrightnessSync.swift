@@ -10,7 +10,8 @@ struct BrightnessSyncTarget: Codable, Identifiable, Equatable {
 
     func validate() throws {
         guard !identity.uuid.isEmpty, !name.isEmpty, name.count <= 120,
-              ratio.isFinite, (0.25...1.5).contains(ratio) else {
+            ratio.isFinite, (0.25...1.5).contains(ratio)
+        else {
             throw DisplayFailure(message: "亮度联动配置无效。比例需在 25–150% 之间。")
         }
     }
@@ -35,22 +36,26 @@ struct BrightnessSyncEnvironment {
     var now: () -> Date
 
     static var live: BrightnessSyncEnvironment {
-        BrightnessSyncEnvironment(screens: {
-            DisplayCore.onlineIDs().compactMap { id in
-                // A closed-lid/inactive built-in panel must not drive followers
-                // with a stale or zero backlight reading.
-                guard CGDisplayIsActive(id) != 0, CGDisplayIsAsleep(id) == 0, let identity = DisplayIdentity.capture(id) else { return nil }
-                let screen = NSScreen.screens.first {
-                    ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id
+        BrightnessSyncEnvironment(
+            screens: {
+                DisplayCore.onlineIDs().compactMap { id in
+                    // A closed-lid/inactive built-in panel must not drive followers
+                    // with a stale or zero backlight reading.
+                    guard CGDisplayIsActive(id) != 0, CGDisplayIsAsleep(id) == 0,
+                        let identity = DisplayIdentity.capture(id)
+                    else { return nil }
+                    let screen = NSScreen.screens.first {
+                        ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == id
+                    }
+                    return BrightnessSyncScreen(
+                        displayID: id, identity: identity,
+                        name: screen?.localizedName ?? "显示器 \(id)", builtIn: CGDisplayIsBuiltin(id) != 0,
+                        mirrored: CGDisplayIsInMirrorSet(id) != 0,
+                        studioVirtual: CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354)
                 }
-                return BrightnessSyncScreen(displayID: id, identity: identity,
-                    name: screen?.localizedName ?? "显示器 \(id)", builtIn: CGDisplayIsBuiltin(id) != 0,
-                    mirrored: CGDisplayIsInMirrorSet(id) != 0,
-                    studioVirtual: CGDisplayVendorNumber(id) == 0x4844 && CGDisplayModelNumber(id) == 0x5354)
-            }
-        }, sourceRead: { try NativeBrightnessService.shared.read(displayID: $0) },
-        targetRead: { try await HardwareBrightness.read(displayID: $0) },
-        write: { try await HardwareBrightness.set($0, displayID: $1, expectedIdentity: $2) }, now: Date.init)
+            }, sourceRead: { try NativeBrightnessService.shared.read(displayID: $0) },
+            targetRead: { try await HardwareBrightness.read(displayID: $0) },
+            write: { try await HardwareBrightness.set($0, displayID: $1, expectedIdentity: $2) }, now: Date.init)
     }
 }
 
@@ -84,8 +89,10 @@ final class BrightnessSyncManager: ObservableObject {
     private var lastWrite: [String: Date] = [:]
     private var retryAfter: [String: Date] = [:]
 
-    init(defaults: UserDefaults = .standard, environment: BrightnessSyncEnvironment = .live,
-         observeNotifications: Bool = true) {
+    init(
+        defaults: UserDefaults = .standard, environment: BrightnessSyncEnvironment = .live,
+        observeNotifications: Bool = true
+    ) {
         self.defaults = defaults
         self.environment = environment
         self.observeNotifications = observeNotifications
@@ -112,22 +119,47 @@ final class BrightnessSyncManager: ObservableObject {
         guard !started, !stopped else { return }
         started = true
         if observeNotifications {
-            observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
-                object: nil, queue: .main) { [weak self] _ in self?.refreshScreens() })
-            workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
-                object: nil, queue: .main) { [weak self] _ in self?.sleeping = true; self?.cancelWork() })
-            workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
-                object: nil, queue: .main) { [weak self] _ in
+            observers.append(
+                NotificationCenter.default.addObserver(
+                    forName: NSApplication.didChangeScreenParametersNotification,
+                    object: nil, queue: .main
+                ) { [weak self] _ in self?.refreshScreens() })
+            workspaceObservers.append(
+                NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.willSleepNotification,
+                    object: nil, queue: .main
+                ) { [weak self] _ in
+                    self?.sleeping = true
+                    self?.cancelWork()
+                })
+            workspaceObservers.append(
+                NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.didWakeNotification,
+                    object: nil, queue: .main
+                ) { [weak self] _ in
                     guard let self else { return }
-                    self.sleeping = false; self.lastAppliedSource.removeAll(); self.retryAfter.removeAll()
+                    self.sleeping = false
+                    self.lastAppliedSource.removeAll()
+                    self.retryAfter.removeAll()
                     self.refreshScreens()
                 })
-            workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification,
-                object: nil, queue: .main) { [weak self] _ in self?.screensSleeping = true; self?.cancelWork() })
-            workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification,
-                object: nil, queue: .main) { [weak self] _ in
+            workspaceObservers.append(
+                NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.screensDidSleepNotification,
+                    object: nil, queue: .main
+                ) { [weak self] _ in
+                    self?.screensSleeping = true
+                    self?.cancelWork()
+                })
+            workspaceObservers.append(
+                NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.screensDidWakeNotification,
+                    object: nil, queue: .main
+                ) { [weak self] _ in
                     guard let self else { return }
-                    self.screensSleeping = false; self.lastAppliedSource.removeAll(); self.retryAfter.removeAll()
+                    self.screensSleeping = false
+                    self.lastAppliedSource.removeAll()
+                    self.retryAfter.removeAll()
                     self.refreshScreens()
                 })
         }
@@ -139,8 +171,12 @@ final class BrightnessSyncManager: ObservableObject {
         cancelWork()
         enabled = value
         defaults.set(value, forKey: enabledKey)
-        sourceError = nil; targetErrors.removeAll()
-        if value { lastAppliedSource.removeAll(); retryAfter.removeAll() }
+        sourceError = nil
+        targetErrors.removeAll()
+        if value {
+            lastAppliedSource.removeAll()
+            retryAfter.removeAll()
+        }
         updateTimer()
         if value && started { launchSample() }
     }
@@ -149,27 +185,33 @@ final class BrightnessSyncManager: ObservableObject {
         guard !stopped, let index = targets.firstIndex(where: { $0.identity == identity }) else { return }
         cancelWork()
         targets[index].enabled = value
-        lastAppliedSource[identity.uuid] = nil; retryAfter[identity.uuid] = nil; targetErrors[identity.uuid] = nil
+        lastAppliedSource[identity.uuid] = nil
+        retryAfter[identity.uuid] = nil
+        targetErrors[identity.uuid] = nil
         persist()
         if enabled && started { launchSample() }
     }
 
     func setRatio(_ value: Double, identity: DisplayIdentity) {
         guard value.isFinite, (0.25...1.5).contains(value) else {
-            error = "联动比例需在 25–150% 之间。"; return
+            error = "联动比例需在 25–150% 之间。"
+            return
         }
         guard !stopped, let index = targets.firstIndex(where: { $0.identity == identity }) else { return }
         guard abs(targets[index].ratio - value) > 0.00001 else { return }
         cancelWork()
         targets[index].ratio = value
-        lastAppliedSource[identity.uuid] = nil; retryAfter[identity.uuid] = nil
+        lastAppliedSource[identity.uuid] = nil
+        retryAfter[identity.uuid] = nil
         persist()
         if enabled && started { launchSample() }
     }
 
     func syncNow() {
         guard enabled, !stopped else { return }
-        cancelWork(); lastAppliedSource.removeAll(); retryAfter.removeAll()
+        cancelWork()
+        lastAppliedSource.removeAll()
+        retryAfter.removeAll()
         launchSample()
     }
 
@@ -185,7 +227,8 @@ final class BrightnessSyncManager: ObservableObject {
         cancelWork()
         if changed.builtIn { return }
         guard let source = sourceScreen(in: current), let reading = try? environment.sourceRead(source.displayID),
-              reading.identity == source.identity else { return }
+            reading.identity == source.identity
+        else { return }
         lastAppliedSource[changed.identity.uuid] = reading.value
         retryAfter[changed.identity.uuid] = nil
     }
@@ -198,8 +241,12 @@ final class BrightnessSyncManager: ObservableObject {
         if changed {
             cancelWork()
             let live = Set(current.map { $0.identity.uuid })
-            for key in Set(lastAppliedSource.keys).union(lastWrite.keys).union(retryAfter.keys).union(targetErrors.keys) where !live.contains(key) {
-                lastAppliedSource[key] = nil; lastWrite[key] = nil; retryAfter[key] = nil; targetErrors[key] = nil
+            for key in Set(lastAppliedSource.keys).union(lastWrite.keys).union(retryAfter.keys).union(targetErrors.keys)
+            where !live.contains(key) {
+                lastAppliedSource[key] = nil
+                lastWrite[key] = nil
+                retryAfter[key] = nil
+                targetErrors[key] = nil
             }
             for screen in current where old[screen.identity.uuid] != screen {
                 lastAppliedSource[screen.identity.uuid] = nil
@@ -208,12 +255,18 @@ final class BrightnessSyncManager: ObservableObject {
             screens = current
         }
         let source = sourceScreen(in: current)
-        if sourceName != source?.name { sourceName = source?.name; sourceError = nil; lastAppliedSource.removeAll() }
+        if sourceName != source?.name {
+            sourceName = source?.name
+            sourceError = nil
+            lastAppliedSource.removeAll()
+        }
         var next = targets
         for screen in current where screen.canFollow {
-            if let index = next.firstIndex(where: { $0.identity == screen.identity }) { next[index].name = screen.name }
-            else if next.count < 32 {
-                next.append(BrightnessSyncTarget(identity: screen.identity, name: screen.name, enabled: false, ratio: 1))
+            if let index = next.firstIndex(where: { $0.identity == screen.identity }) {
+                next[index].name = screen.name
+            } else if next.count < 32 {
+                next.append(
+                    BrightnessSyncTarget(identity: screen.identity, name: screen.name, enabled: false, ratio: 1))
             }
         }
         if next != targets { targets = next }
@@ -237,7 +290,8 @@ final class BrightnessSyncManager: ObservableObject {
     }
 
     private func updateTimer() {
-        timer?.invalidate(); timer = nil
+        timer?.invalidate()
+        timer = nil
         guard enabled, started, !stopped else { return }
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.launchSample() }
         self.timer = timer
@@ -246,7 +300,8 @@ final class BrightnessSyncManager: ObservableObject {
 
     private func cancelWork() {
         generation += 1
-        operation?.cancel(); operation = nil
+        operation?.cancel()
+        operation = nil
     }
 
     private func launchSample() {
@@ -275,7 +330,9 @@ final class BrightnessSyncManager: ObservableObject {
         let initial: NativeBrightnessReading
         do {
             initial = try environment.sourceRead(source.displayID)
-            guard initial.displayID == source.displayID, initial.identity == source.identity, initial.value.isFinite, (0...1).contains(initial.value) else {
+            guard initial.displayID == source.displayID, initial.identity == source.identity, initial.value.isFinite,
+                (0...1).contains(initial.value)
+            else {
                 throw DisplayFailure(message: "内置屏亮度读回无效。")
             }
             if sourceError != nil { sourceError = nil }
@@ -293,9 +350,13 @@ final class BrightnessSyncManager: ObservableObject {
             if let written = lastWrite[key], time.timeIntervalSince(written) < 0.8 { continue }
             do {
                 let before = try await environment.targetRead(screen.displayID)
-                guard shouldContinue(token), stillConnected(screen), stillConnected(source), before.displayID == screen.displayID, before.identity == target.identity else { return }
+                guard shouldContinue(token), stillConnected(screen), stillConnected(source),
+                    before.displayID == screen.displayID, before.identity == target.identity
+                else { return }
                 let freshSource = try environment.sourceRead(source.displayID)
-                guard freshSource.displayID == source.displayID, freshSource.identity == source.identity, freshSource.value.isFinite, (0...1).contains(freshSource.value) else {
+                guard freshSource.displayID == source.displayID, freshSource.identity == source.identity,
+                    freshSource.value.isFinite, (0...1).contains(freshSource.value)
+                else {
                     throw DisplayFailure(message: "内置屏亮度或身份已变化。")
                 }
                 let desired = Self.targetValue(source: freshSource.value, ratio: target.ratio)
@@ -303,15 +364,16 @@ final class BrightnessSyncManager: ObservableObject {
                     guard shouldContinue(token), stillConnected(screen), stillConnected(source) else { return }
                     lastWrite[key] = environment.now()
                     let applied = try await environment.write(desired, screen.displayID, target.identity)
-                    guard shouldContinue(token), stillConnected(screen), applied.displayID == screen.displayID, applied.identity == target.identity else { return }
+                    guard shouldContinue(token), stillConnected(screen), applied.displayID == screen.displayID,
+                        applied.identity == target.identity
+                    else { return }
                     guard Self.matches(applied, target: desired) else { throw DisplayFailure(message: "显示器没有采用联动亮度。") }
                     onApplied(applied)
                 }
                 lastAppliedSource[key] = freshSource.value
                 if targetErrors[key] != nil { targetErrors[key] = nil }
                 retryAfter[key] = nil
-            } catch is CancellationError { return }
-            catch {
+            } catch is CancellationError { return } catch {
                 guard shouldContinue(token) else { return }
                 if targetErrors[key] != error.localizedDescription { targetErrors[key] = error.localizedDescription }
                 // Unsupported or busy monitors are not queried every second.
@@ -324,25 +386,34 @@ final class BrightnessSyncManager: ObservableObject {
         enabled && !sleeping && !screensSleeping && !stopped && !isBlocked() && generation == token && !Task.isCancelled
     }
     private func stillConnected(_ screen: BrightnessSyncScreen) -> Bool {
-        environment.screens().contains { $0.displayID == screen.displayID && $0.identity == screen.identity &&
-            !$0.mirrored && !$0.studioVirtual && $0.builtIn == screen.builtIn }
+        environment.screens().contains {
+            $0.displayID == screen.displayID && $0.identity == screen.identity && !$0.mirrored && !$0.studioVirtual
+                && $0.builtIn == screen.builtIn
+        }
     }
     static func targetValue(source: Double, ratio: Double) -> Double { min(1, max(0, source * ratio)) }
     private static func matches(_ reading: NativeBrightnessReading, target: Double) -> Bool {
         if reading.backend == .ddc, let maximum = reading.rawMaximum, let current = reading.rawCurrent,
-           let scaled = try? DDCBrightnessPacket.scaledValue(normalized: target, maximum: maximum) {
+            let scaled = try? DDCBrightnessPacket.scaledValue(normalized: target, maximum: maximum)
+        {
             return current == scaled
         }
         return NativeBrightnessService.matches(reading.value, target)
     }
 
     func shutdown() {
-        stopped = true; cancelWork(); timer?.invalidate(); timer = nil
-        observers.forEach(NotificationCenter.default.removeObserver); observers.removeAll()
-        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver); workspaceObservers.removeAll()
+        stopped = true
+        cancelWork()
+        timer?.invalidate()
+        timer = nil
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        workspaceObservers.removeAll()
     }
     deinit {
-        timer?.invalidate(); operation?.cancel()
+        timer?.invalidate()
+        operation?.cancel()
         observers.forEach(NotificationCenter.default.removeObserver)
         workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
     }
@@ -378,32 +449,43 @@ struct BrightnessSyncView: View {
             ForEach(manager.targets) { target in
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 10) {
-                        Toggle(target.name, isOn: Binding(get: {
-                            manager.targets.first(where: { $0.id == target.id })?.enabled ?? false
-                        }, set: { manager.setTargetEnabled($0, identity: target.identity) }))
-                            .toggleStyle(.checkbox).lineLimit(2)
+                        Toggle(
+                            target.name,
+                            isOn: Binding(
+                                get: {
+                                    manager.targets.first(where: { $0.id == target.id })?.enabled ?? false
+                                }, set: { manager.setTargetEnabled($0, identity: target.identity) })
+                        )
+                        .toggleStyle(.checkbox).lineLimit(2)
                         Spacer(minLength: 4)
                         if manager.connectedScreen(for: target) == nil {
                             Text("未连接或不可独立控制").font(.caption).foregroundStyle(.secondary)
                         }
-                        Slider(value: Binding(get: {
-                            manager.targets.first(where: { $0.id == target.id })?.ratio ?? 1
-                        }, set: { manager.setRatio($0, identity: target.identity) }), in: 0.25...1.5, step: 0.05)
-                            .frame(width: 125).disabled(!target.enabled)
-                            .accessibilityLabel(target.name + " 联动比例")
-                        Text(String(format: "%.0f%%", target.ratio * 100)).font(.caption).monospacedDigit().frame(width: 40)
+                        Slider(
+                            value: Binding(
+                                get: {
+                                    manager.targets.first(where: { $0.id == target.id })?.ratio ?? 1
+                                }, set: { manager.setRatio($0, identity: target.identity) }), in: 0.25...1.5, step: 0.05
+                        )
+                        .frame(width: 125).disabled(!target.enabled)
+                        .accessibilityLabel(target.name + " 联动比例")
+                        Text(String(format: "%.0f%%", target.ratio * 100)).font(.caption).monospacedDigit().frame(
+                            width: 40)
                     }
                     if let error = manager.targetErrors[target.id] {
                         Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                     }
-                }.padding(12).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                }.padding(12).background(
+                    Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             HStack {
                 Text("仅在应用运行且开启时联动；手动调外接屏后，等内置屏再次变化再跟随。")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 8)
                 Button("立即同步") { manager.syncNow() }
-                    .disabled(!manager.enabled || manager.sourceName == nil || manager.isBlocked() || displayModel.isBusy || displayModel.hasTrial)
+                    .disabled(
+                        !manager.enabled || manager.sourceName == nil || manager.isBlocked() || displayModel.isBusy
+                            || displayModel.hasTrial)
             }
         }
     }

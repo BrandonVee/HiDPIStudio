@@ -44,12 +44,13 @@ static const HDModeAPIs *HDGetModeAPIs(void) {
     static HDModeAPIs api;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        // Keep handles loaded for as long as any function pointer can be used.
-        api.coreGraphics = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY | RTLD_LOCAL);
-        api.skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY | RTLD_LOCAL);
-        api.count = (HDModeCountFunction)HDModeSymbol(&api, "CGSGetNumberOfDisplayModes");
-        api.describe = (HDModeDescriptionFunction)HDModeSymbol(&api, "CGSGetDisplayModeDescriptionOfLength");
-        api.configure = (HDModeConfigureFunction)HDModeSymbol(&api, "CGSConfigureDisplayMode");
+      // Keep handles loaded for as long as any function pointer can be used.
+      api.coreGraphics =
+          dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY | RTLD_LOCAL);
+      api.skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY | RTLD_LOCAL);
+      api.count = (HDModeCountFunction)HDModeSymbol(&api, "CGSGetNumberOfDisplayModes");
+      api.describe = (HDModeDescriptionFunction)HDModeSymbol(&api, "CGSGetDisplayModeDescriptionOfLength");
+      api.configure = (HDModeConfigureFunction)HDModeSymbol(&api, "CGSConfigureDisplayMode");
     });
     return &api;
 }
@@ -57,16 +58,16 @@ static const HDModeAPIs *HDGetModeAPIs(void) {
 static BOOL HDUsableMode(const HDModeDescription *mode) {
     // The private flag is the same usability exclusion used by the public API.
     // Only strict 2x modes are accepted; unknown future densities are rejected.
-    return !(mode->flags & 0x40000000) && isfinite(mode->density) &&
-           fabsf(mode->density - 2.0f) < 0.001f &&
-           mode->width >= 320 && mode->height >= 200 &&
-           mode->width <= 16384 && mode->height <= 16384 &&
+    return !(mode->flags & 0x40000000) && isfinite(mode->density) && fabsf(mode->density - 2.0f) < 0.001f &&
+           mode->width >= 320 && mode->height >= 200 && mode->width <= 16384 && mode->height <= 16384 &&
            mode->frequency <= 1000;
 }
 
 static BOOL HDModeFailure(NSError **error, NSInteger code, NSString *description) {
-    if (error) *error = [NSError errorWithDomain:@"HiDPIStudio.HiddenModes" code:code
-                                      userInfo:@{NSLocalizedDescriptionKey: description}];
+    if (error)
+        *error = [NSError errorWithDomain:@"HiDPIStudio.HiddenModes"
+                                     code:code
+                                 userInfo:@{NSLocalizedDescriptionKey : description}];
     return NO;
 }
 
@@ -97,13 +98,15 @@ static BOOL HDModeFailure(NSError **error, NSInteger code, NSString *description
 }
 
 + (NSArray<HDHiddenDisplayMode *> *)modesForDisplay:(CGDirectDisplayID)display {
-    if (![self isAvailable] || !CGDisplayIsOnline(display)) return @[];
+    if (![self isAvailable] || !CGDisplayIsOnline(display))
+        return @[];
     const HDModeAPIs *api = HDGetModeAPIs();
     int32_t count = 0;
-    if (api->count(display, &count) != kCGErrorSuccess || count <= 0 || count > 8192) return @[];
+    if (api->count(display, &count) != kCGErrorSuccess || count <= 0 || count > 8192)
+        return @[];
 
     NSMutableSet<NSNumber *> *publicIDs = [NSMutableSet set];
-    NSDictionary *options = @{(__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes: @YES};
+    NSDictionary *options = @{(__bridge NSString *)kCGDisplayShowDuplicateLowResolutionModes : @YES};
     CFArrayRef publicModes = CGDisplayCopyAllDisplayModes(display, (__bridge CFDictionaryRef)options);
     if (publicModes) {
         for (CFIndex i = 0; i < CFArrayGetCount(publicModes); i++) {
@@ -117,20 +120,28 @@ static BOOL HDModeFailure(NSError **error, NSInteger code, NSString *description
     NSMutableArray<HDHiddenDisplayMode *> *result = [NSMutableArray array];
     for (int32_t index = 0; index < count; index++) {
         HDModeDescription description = {0};
-        if (api->describe(display, index, &description, sizeof(description)) != kCGErrorSuccess || !HDUsableMode(&description)) continue;
+        if (api->describe(display, index, &description, sizeof(description)) != kCGErrorSuccess ||
+            !HDUsableMode(&description))
+            continue;
         NSNumber *identifier = @((int32_t)description.modeNumber);
-        if ([publicIDs containsObject:identifier] || [seen containsObject:identifier]) continue;
+        if ([publicIDs containsObject:identifier] || [seen containsObject:identifier])
+            continue;
         [seen addObject:identifier];
         [result addObject:[[HDHiddenDisplayMode alloc] initWithDescription:description]];
     }
     return result;
 }
 
-+ (BOOL)configure:(CGDisplayConfigRef)config display:(CGDirectDisplayID)display
-             mode:(int32_t)modeID error:(NSError **)error {
-    if (!config) return HDModeFailure(error, 1, @"缺少显示设置事务，已取消切换。");
-    if (![self isAvailable]) return HDModeFailure(error, 2, @"当前 macOS 未提供兼容的原生扩展模式接口。");
-    if (!CGDisplayIsOnline(display)) return HDModeFailure(error, 3, @"显示器已断开，请刷新后重试。");
++ (BOOL)configure:(CGDisplayConfigRef)config
+          display:(CGDirectDisplayID)display
+             mode:(int32_t)modeID
+            error:(NSError **)error {
+    if (!config)
+        return HDModeFailure(error, 1, @"缺少显示设置事务，已取消切换。");
+    if (![self isAvailable])
+        return HDModeFailure(error, 2, @"当前 macOS 未提供兼容的原生扩展模式接口。");
+    if (!CGDisplayIsOnline(display))
+        return HDModeFailure(error, 3, @"显示器已断开，请刷新后重试。");
     const HDModeAPIs *api = HDGetModeAPIs();
     int32_t count = 0;
     if (api->count(display, &count) != kCGErrorSuccess || count <= 0 || count > 8192)
@@ -144,7 +155,8 @@ static BOOL HDModeFailure(NSError **error, NSInteger code, NSString *description
             break;
         }
     }
-    if (!found) return HDModeFailure(error, 5, @"请求的原生 HiDPI 模式已不可用，请刷新后重试。");
+    if (!found)
+        return HDModeFailure(error, 5, @"请求的原生 HiDPI 模式已不可用，请刷新后重试。");
     // This is a CGDisplayConfigRef from Begin, never a CGS connection identifier.
     CGError status = api->configure(config, display, modeID);
     if (status != kCGErrorSuccess)

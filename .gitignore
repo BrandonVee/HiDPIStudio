@@ -2,3 +2,6 @@
 .DS_Store
 *.app/
 *.zip
+dist/
+.vscode/settings.json
+.vscode/excel-pq-symbols/
