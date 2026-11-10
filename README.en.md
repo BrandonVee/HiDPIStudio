@@ -51,7 +51,7 @@ shasum -a 256 --check HiDPIStudio-v2.4.0-SHA256SUMS.txt
 | Feature | What it does |
 | --- | --- |
 | **HiDPI display modes** | Browse native modes grouped by desktop size and choose a refresh rate. Custom HiDPI supports 24–240 Hz: it prefers a matching native mode, otherwise mirrors a virtual Retina display. |
-| **Menu bar control center** | See display status, resolution, and refresh rate; adjust brightness, access favorites and presets, and toggle automation. Right-click keeps a native shortcut menu. |
+| **Menu bar control center** | A compact panel with wrapping display selection and no scrolling. Use a stepped resolution slider to preview sizes, release to try and confirm, and adjust brightness directly. Right-click keeps a native shortcut menu. |
 | **System and DDC brightness** | Prefer the system brightness API, with DDC for supported external displays. Every write is checked by reading back the result. |
 | **Separate software filters** | Dim the picture further or add warmth, with a 20% software-brightness floor. Filters do not change the panel's backlight. |
 | **Virtual desktops and picture-in-picture** | Save up to eight virtual-display definitions and connect them on demand. Preview screens through ScreenCaptureKit at up to 1080p / 30 fps. |
@@ -77,7 +77,7 @@ These are real screenshots of v2.4.0 with a built-in Retina display connected. T
 
 - **Quick adjustments:** left-click the menu bar icon to open the control center, or right-click for shortcuts. Closing the main window leaves the app running in the menu bar.
 - **Save a setup:** create a preset under Layouts & Presets, then access it from the main window, menu bar, or a shortcut.
-- **Enable automation:** select follower displays or a restore preset under Sync & Restore before enabling the corresponding feature. F1/F2 controls are under Shortcuts.
+- **Enable automation:** select follower displays or a restore preset under Sync & Restore in the main window before enabling the corresponding feature. F1/F2 and global shortcuts are under Shortcuts.
 - **Quit the app:** confirmed native display modes stay in effect. Virtual displays, mirroring, and software filters require the app to keep running.
 
 ## Compatibility and permissions

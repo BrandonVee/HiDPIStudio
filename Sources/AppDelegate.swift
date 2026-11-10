@@ -15,14 +15,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
     private let statusPopover = NSPopover()
+    private var statusPanelLocalMonitor: Any?
+    private var statusPanelGlobalMonitor: Any?
+    private var statusPanelResignObserver: NSObjectProtocol?
     private var terminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let icon = AppBranding.icon { NSApp.applicationIconImage = icon }
         model.externalOperationBlocked = { [weak self] in
             guard let self else { return true }
-            let otherVirtual = DisplayCore.displays().contains {
-                $0.isStudioVirtual && $0.id != self.model.virtualSourceID
+            // UI availability checks need display identity flags, not every supported mode.
+            let otherVirtual = DisplayCore.onlineIDs().contains {
+                $0 != self.model.virtualSourceID
+                    && CGDisplayVendorNumber($0) == 0x4844 && CGDisplayModelNumber($0) == 0x5354
             }
             return self.layouts.isPending || self.layouts.isBusy || self.workspace.isBusy
                 || self.workspace.hasConnectedScreens || otherVirtual || self.autoRestore.isBusy
@@ -147,31 +152,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
             statusPopover.performClose(nil)
             return
         }
-        let height = min(650, max(360, (sender.window?.screen?.visibleFrame.height ?? 730) - 80))
+        let width = min(380, (sender.window?.screen?.visibleFrame.width ?? 1440) - 40)
         let panel = StatusPanelView(
             model: model, daily: daily, layouts: layouts, workspace: workspace,
-            brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys,
+            autoRestore: autoRestore,
             openSection: { [weak self] in self?.openStatusSection($0) },
-            applyFavorite: { [weak self] in self?.applyFavorite(id: $0) },
-            applyProfile: { [weak self] in self?.applyProfile(id: $0) },
             refresh: { [weak self] in self?.refreshFromStatus() },
-            exportDiagnostics: { [weak self] in
-                self?.showWindow()
-                self?.model.exportDiagnostics()
-            },
-            about: { [weak self] in
-                self?.statusPopover.performClose(nil)
-                NSApp.activate(ignoringOtherApps: true)
-                self?.about()
-            },
-            quit: { NSApp.terminate(nil) }, panelHeight: height)
-        statusPopover.contentViewController = NSHostingController(rootView: panel)
-        statusPopover.contentSize = NSSize(width: 368, height: height)
+            quit: { NSApp.terminate(nil) }, panelWidth: width)
+        let controller = NSHostingController(rootView: panel)
+        // Let the popover follow wrapping display rows and inline trial notices.
+        controller.sizingOptions = [.preferredContentSize]
+        statusPopover.contentViewController = controller
+        statusPopover.contentSize = controller.view.fittingSize
         statusPopover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         daily.refreshSystemBrightness(displayID: model.selectedDisplay)
         statusPopover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        startStatusPanelMonitoring()
         statusPopover.contentViewController?.view.window?.makeKey()
         sender.highlight(true)
+    }
+
+    private func startStatusPanelMonitoring() {
+        stopStatusPanelMonitoring()
+        // A status-item popover can become key while the app remains inactive.
+        // In that case transient behavior alone does not always dismiss it when
+        // the desktop is clicked. Cover clicks in both this app and other apps.
+        statusPanelGlobalMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            self?.statusPopover.performClose(nil)
+        }
+        statusPanelLocalMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]
+        ) { [weak self] event in
+            guard let self, self.statusPopover.isShown else { return event }
+            if event.type == .keyDown {
+                if event.keyCode == 53 {
+                    self.statusPopover.performClose(nil)
+                    return nil
+                }
+                return event
+            }
+            // Native picker/menu windows must finish their own interaction.
+            if event.window?.level == .popUpMenu { return event }
+            let panelWindow = self.statusPopover.contentViewController?.view.window
+            var eventWindow = event.window
+            while let window = eventWindow {
+                if window === panelWindow || window === self.statusItem?.button?.window { return event }
+                eventWindow = window.parent
+            }
+            self.statusPopover.performClose(nil)
+            return event
+        }
+        statusPanelResignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: NSApp, queue: .main
+        ) { [weak self] _ in
+            self?.statusPopover.performClose(nil)
+        }
+    }
+
+    private func stopStatusPanelMonitoring() {
+        if let monitor = statusPanelLocalMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = statusPanelGlobalMonitor { NSEvent.removeMonitor(monitor) }
+        if let observer = statusPanelResignObserver { NotificationCenter.default.removeObserver(observer) }
+        statusPanelLocalMonitor = nil
+        statusPanelGlobalMonitor = nil
+        statusPanelResignObserver = nil
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        stopStatusPanelMonitoring()
     }
 
     func popoverDidClose(_ notification: Notification) {
@@ -351,6 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if terminating { return .terminateNow }
         terminating = true
+        stopStatusPanelMonitoring()
         statusPopover.performClose(nil)
         nativeKeys.shutdown()
         autoRestore.shutdown()
