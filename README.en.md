@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-macOS-arm64.zip"><strong>Download for macOS</strong></a> ·
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-macOS-arm64.zip"><strong>Download for macOS</strong></a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="https://github.com/BrandonVee/HiDPIStudio/issues">Report an issue</a>
@@ -34,16 +34,16 @@
 
 ## Getting started
 
-1. Download [v2.4.0 for Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-macOS-arm64.zip), or browse all [Releases](https://github.com/BrandonVee/HiDPIStudio/releases).
+1. Download [v2.4.1 for Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-macOS-arm64.zip), or browse all [Releases](https://github.com/BrandonVee/HiDPIStudio/releases).
 2. Unzip the download, move **HiDPI Studio.app** to **Applications**, and open it.
 3. Select a display in the sidebar. When changing its resolution, try the mode and confirm within **15 seconds** to keep it.
 
 > This is a **pre-release**, signed ad hoc and **not Developer ID signed or notarized by Apple**. If macOS blocks the first launch, follow the prompts in **System Settings → Privacy & Security** to allow the app to open.
 
-You do not need to disable SIP or install display drivers. To verify your download, save the [SHA256 checksum file](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-SHA256SUMS.txt) alongside the ZIP and run:
+You do not need to disable SIP or install display drivers. To verify your download, save the [SHA256 checksum file](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-SHA256SUMS.txt) alongside the ZIP and run:
 
 ```bash
-shasum -a 256 --check HiDPIStudio-v2.4.0-SHA256SUMS.txt
+shasum -a 256 --check HiDPIStudio-v2.4.1-SHA256SUMS.txt
 ```
 
 ## Features

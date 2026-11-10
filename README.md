@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-macOS-arm64.zip"><strong>下载 macOS 应用</strong></a> ·
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-macOS-arm64.zip"><strong>下载 macOS 应用</strong></a> ·
   <a href="#界面预览">界面预览</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
   <a href="https://github.com/BrandonVee/HiDPIStudio/issues">问题反馈</a>
@@ -34,16 +34,16 @@
 
 ## 快速开始
 
-1. 下载 [v2.4.0 · Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-macOS-arm64.zip)，或在 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 查看所有版本。
+1. 下载 [v2.4.1 · Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-macOS-arm64.zip)，或在 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 查看所有版本。
 2. 解压，将 **HiDPI Studio.app** 移到“应用程序”文件夹后打开。
 3. 在左侧选择显示器；调整分辨率后，先试用，再在 **15 秒内确认**保留。
 
 > 当前版本为 **Pre-release（预览版）**，使用 ad-hoc 签名，尚未经 Developer ID 签名或 Apple 公证。首次打开如被 macOS 拦截，请按系统“隐私与安全性”中的提示允许打开。
 
-应用不需要关闭 SIP 或安装显示器驱动。安装包附带 [SHA256 校验文件](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.0/HiDPIStudio-v2.4.0-SHA256SUMS.txt)，将它与 ZIP 放在同一目录后可运行：
+应用不需要关闭 SIP 或安装显示器驱动。安装包附带 [SHA256 校验文件](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-SHA256SUMS.txt)，将它与 ZIP 放在同一目录后可运行：
 
 ```bash
-shasum -a 256 --check HiDPIStudio-v2.4.0-SHA256SUMS.txt
+shasum -a 256 --check HiDPIStudio-v2.4.1-SHA256SUMS.txt
 ```
 
 ## 功能亮点
