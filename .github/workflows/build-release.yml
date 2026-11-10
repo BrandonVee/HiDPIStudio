@@ -47,7 +47,7 @@ jobs:
           overwrite: true
 
   release:
-    name: Publish preview release
+    name: Publish release
     needs: build
     if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     runs-on: ubuntu-24.04
@@ -81,7 +81,7 @@ jobs:
           print(notes)
           print("\n## 下载与运行\n")
           print(f"下载 `HiDPIStudio-{tag}-macOS-arm64.zip`，解压后打开 **HiDPI Studio.app**。")
-          print("\n适用于 Apple Silicon，最低 macOS 13。此版本为预览版，采用 ad-hoc 签名，未经 Developer ID 签名或 Apple 公证。")
+          print("\n适用于 Apple Silicon，最低 macOS 13。采用 ad-hoc 签名，未经 Developer ID 签名或 Apple 公证。")
           print(f"\n可使用 `shasum -a 256 --check HiDPIStudio-{tag}-SHA256SUMS.txt` 校验安装包。")
           PY
       - name: Upload to draft, then publish
@@ -96,11 +96,11 @@ jobs:
             fi
           else
             gh release create "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" \
-              --verify-tag --draft --prerelease \
-              --title "HiDPI Studio ${STUDIO_TAG#v} · 预览版" \
+              --verify-tag --draft --prerelease=false \
+              --title "HiDPI Studio ${STUDIO_TAG#v}" \
               --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
           gh release upload "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
             "dist/HiDPIStudio-${STUDIO_TAG}-macOS-arm64.zip" \
             "dist/HiDPIStudio-${STUDIO_TAG}-SHA256SUMS.txt"
-          gh release edit "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          gh release edit "$STUDIO_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest

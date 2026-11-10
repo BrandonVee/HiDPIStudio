@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml"><img src="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml/badge.svg?branch=main" alt="Build status"></a>
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?include_prereleases&amp;label=release" alt="Latest release, including previews"></a>
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?label=release" alt="Latest stable release"></a>
   <a href="#compatibility-and-permissions"><img src="https://img.shields.io/badge/macOS-13%2B-007AFF" alt="macOS 13 or later"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-34C759" alt="MIT license"></a>
 </p>
@@ -38,7 +38,7 @@
 2. Unzip the download, move **HiDPI Studio.app** to **Applications**, and open it.
 3. Select a display in the sidebar. When changing its resolution, try the mode and confirm within **15 seconds** to keep it.
 
-> This is a **pre-release**, signed ad hoc and **not Developer ID signed or notarized by Apple**. If macOS blocks the first launch, follow the prompts in **System Settings → Privacy & Security** to allow the app to open.
+> The app is **signed ad hoc**, and **not Developer ID signed or notarized by Apple**. If macOS blocks the first launch, follow the prompts in **System Settings → Privacy & Security** to allow the app to open.
 
 You do not need to disable SIP or install display drivers. To verify your download, save the [SHA256 checksum file](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-SHA256SUMS.txt) alongside the ZIP and run:
 
@@ -146,7 +146,7 @@ Artifacts are written to `dist/`. `--test-virtual`, `--test-workspace`, and `--t
 ### CI/CD
 
 - Push to `main`, open a PR against `main`, or run the workflow manually: build the ARM64 app, run isolated checks, and upload ZIP and SHA256 artifacts.
-- Push a version tag: verify version consistency, then publish a preview release after successful checks.
+- Push a version tag: verify version consistency, then publish a stable release and mark it as Latest after successful checks.
 - The maintainer's local publishing process backs up and verifies branches and tags on **GitLab before GitHub**.
 
 See [Actions](https://github.com/BrandonVee/HiDPIStudio/actions) and the [release guide](docs/RELEASING.md) (Chinese).

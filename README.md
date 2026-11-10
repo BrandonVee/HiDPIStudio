@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml"><img src="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml/badge.svg?branch=main" alt="构建状态"></a>
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?include_prereleases&amp;label=release" alt="最新版本（含预览版）"></a>
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?label=release" alt="最新正式版本"></a>
   <a href="#兼容性与权限"><img src="https://img.shields.io/badge/macOS-13%2B-007AFF" alt="macOS 13 或更新版本"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-34C759" alt="MIT 许可证"></a>
 </p>
@@ -38,7 +38,7 @@
 2. 解压，将 **HiDPI Studio.app** 移到“应用程序”文件夹后打开。
 3. 在左侧选择显示器；调整分辨率后，先试用，再在 **15 秒内确认**保留。
 
-> 当前版本为 **Pre-release（预览版）**，使用 ad-hoc 签名，尚未经 Developer ID 签名或 Apple 公证。首次打开如被 macOS 拦截，请按系统“隐私与安全性”中的提示允许打开。
+> 当前安装包使用 **ad-hoc 签名**，尚未经 Developer ID 签名或 Apple 公证。首次打开如被 macOS 拦截，请按系统“隐私与安全性”中的提示允许打开。
 
 应用不需要关闭 SIP 或安装显示器驱动。安装包附带 [SHA256 校验文件](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.1/HiDPIStudio-v2.4.1-SHA256SUMS.txt)，将它与 ZIP 放在同一目录后可运行：
 
@@ -146,7 +146,7 @@ open '.build/HiDPI Studio.app'
 ### CI/CD
 
 - 推送 `main`、向 `main` 提交 PR 或手动运行：构建 ARM64 应用、运行隔离检查、上传 ZIP 与 SHA256 构建产物。
-- 推送版本标签：检查版本一致性，通过后自动发布预览版 Release。
+- 推送版本标签：检查版本一致性，通过后自动发布正式 Release 并标记为 Latest。
 - 本机发布按 **GitLab → GitHub** 的顺序备份并校验分支和标签。
 
 查看 [Actions](https://github.com/BrandonVee/HiDPIStudio/actions) 或 [完整发布流程](docs/RELEASING.md)。

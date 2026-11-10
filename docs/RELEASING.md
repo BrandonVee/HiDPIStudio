@@ -8,7 +8,7 @@
 | --- | --- |
 | 推送 `main` / 向 `main` 提交 PR | 构建、运行隔离检查、验证签名和 ZIP，上传 14 天有效的构建产物。 |
 | Actions 手动运行 | 同样构建；选择版本标签时也会执行发布。 |
-| 推送 `vMAJOR.MINOR.PATCH` 标签 | 检查标签与应用版本一致，构建通过后创建草稿、上传 ZIP 与 SHA256，再发布预览版。 |
+| 推送 `vMAJOR.MINOR.PATCH` 标签 | 检查标签与应用版本一致，构建通过后创建草稿、上传 ZIP 与 SHA256，再发布正式 Release 并标记为 Latest。 |
 
 流程文件：`.github/workflows/build-release.yml`。构建 job 只有代码读取权限，发布 job 才有 `contents: write`；使用 GitHub 自带的 `GITHUB_TOKEN`，无需另存个人访问令牌。依赖的 Actions 固定到提交 SHA。
 
@@ -39,4 +39,4 @@
 
 ## 签名范围
 
-当前自动发布使用本地 ad-hoc 签名，面向 Apple Silicon，构建目标为 macOS 13+。未配置 Developer ID 证书、Apple 公证或 Intel 安装包。Release 会明确标注预览版和签名范围；用户首次打开仍可能需要在 macOS“隐私与安全性”中允许打开。
+当前自动发布正式 Release，使用本地 ad-hoc 签名，面向 Apple Silicon，构建目标为 macOS 13+。未配置 Developer ID 证书、Apple 公证或 Intel 安装包。Release 说明保留签名范围；用户首次打开仍可能需要在 macOS“隐私与安全性”中允许打开。
