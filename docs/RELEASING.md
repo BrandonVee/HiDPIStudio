@@ -14,7 +14,7 @@
 
 ## 发布一个新版本
 
-1. 更新 `Resources/Info.plist` 的 `CFBundleShortVersionString`，例如 `2.4.1`，并递增 `CFBundleVersion`。更新 `CHANGELOG.md` 中对应的 `## 2.4.1` 条目和 README 下载名称。
+1. 更新 `Resources/Info.plist` 的 `CFBundleShortVersionString`，例如 `2.4.1`，并递增 `CFBundleVersion`。更新 `CHANGELOG.md` 中对应的 `## 2.4.1` 条目和中英文 README（`README.md` / `README.en.md`）中的版本与下载链接。
 2. 运行 `./scripts/package.sh`。脚本构建干净的应用包，运行 `--test-ci`，检查 ARM64 架构与 ad-hoc 签名，生成 ZIP，解压后再验证签名并生成 SHA256。不会更改实体显示模式或硬件亮度。
 3. 检查差异并提交代码，为该提交创建新标签：`git tag -a v2.4.1 -m 'HiDPI Studio 2.4.1'`。
 4. 执行 `git publish --tag v2.4.1`。它先原子推送本地分支和指定标签到 `origin`（GitLab），校验远程引用后才推送并校验 `github`。GitLab 失败时停止。
