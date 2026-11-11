@@ -153,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
             statusPopover.performClose(nil)
             return
         }
-        let width = min(380, (sender.window?.screen?.visibleFrame.width ?? 1440) - 40)
+        let width = min(460, (sender.window?.screen?.visibleFrame.width ?? 1440) - 40)
         let panel = StatusPanelView(
             model: model, daily: daily, layouts: layouts, workspace: workspace,
             autoRestore: autoRestore,
@@ -161,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
             refresh: { [weak self] in self?.refreshFromStatus() },
             quit: { NSApp.terminate(nil) }, panelWidth: width)
         let controller = NSHostingController(rootView: panel)
-        // Let the popover follow wrapping display rows and inline trial notices.
+        // Let the popover follow the two-column control cards and inline trial notices.
         controller.sizingOptions = [.preferredContentSize]
         statusPopover.contentViewController = controller
         statusPopover.contentSize = controller.view.fittingSize

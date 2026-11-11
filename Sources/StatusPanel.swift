@@ -3,6 +3,11 @@ import SwiftUI
 
 /// Menu-bar presentation shares the same managers and hardware safeguards as the main window.
 struct StatusPanelView: View {
+    private enum ControlTab: Hashable {
+        case resolution
+        case brightness
+    }
+
     @ObservedObject var model: DisplayModel
     @ObservedObject var daily: DailyControlManager
     @ObservedObject var layouts: LayoutProfileManager
@@ -11,12 +16,11 @@ struct StatusPanelView: View {
     let openSection: (StudioSection) -> Void
     let refresh: () -> Void
     let quit: () -> Void
-    var panelWidth: CGFloat = 380
+    var panelWidth: CGFloat = 460
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var displaySelection
-    @State private var resolutionPreviewID: String?
-    @State private var resolutionIdentity: DisplayIdentity?
+    @State private var activeTab: ControlTab = .resolution
+    @State private var resolutionPreviewIDs: [CGDirectDisplayID: String] = [:]
+    @State private var resolutionIdentities: [CGDirectDisplayID: DisplayIdentity] = [:]
 
     private var isConfiguring: Bool {
         model.hasTrial || model.isBusy || layouts.isPending || layouts.isBusy || workspace.isBusy || autoRestore.isBusy
@@ -25,9 +29,8 @@ struct StatusPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().padding(.horizontal, 16)
+            iconTabs
             VStack(alignment: .leading, spacing: 8) {
-                if !model.displays.isEmpty { displayPicker }
                 if model.hasTrial || layouts.isPending {
                     trialNotice
                 } else if isConfiguring {
@@ -36,8 +39,21 @@ struct StatusPanelView: View {
                         Text("正在更新显示设置…").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if let display = model.currentDisplay {
-                    displayControls(display)
+                Text("DISPLAYS")
+                    .font(.system(size: 13, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 5)
+                if !model.displays.isEmpty {
+                    ScrollView(.vertical) {
+                        switch activeTab {
+                        case .resolution:
+                            resolutionGrid
+                        case .brightness:
+                            brightnessGrid
+                        }
+                    }
+                    .frame(maxHeight: 440)
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "display.trianglebadge.exclamationmark")
@@ -51,33 +67,45 @@ struct StatusPanelView: View {
                         .font(.caption).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }.padding(14)
-            Divider().padding(.horizontal, 16)
+            }.padding(.horizontal, 20).padding(.vertical, 16)
+            Divider()
+                .overlay(Color.white.opacity(0.14))
+                .padding(.horizontal, 20)
             footer
         }
         .frame(width: panelWidth)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial)
+        .background(Color(red: 0.055, green: 0.065, blue: 0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .preferredColorScheme(.dark)
         .tint(StudioStyle.accent)
-        .onChange(of: model.selectedDisplay) { id in
-            resolutionPreviewID = nil
-            resolutionIdentity = nil
-            model.selectPreferredMode()
-            daily.refreshSystemBrightness(displayID: id)
+        .onAppear {
+            refreshBrightnessReadings()
         }
+        .onChange(of: model.displays.map(\.id)) { _ in refreshBrightnessReadings() }
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            if let icon = AppBranding.icon {
-                Image(nsImage: icon).resizable().frame(width: 26, height: 26).accessibilityHidden(true)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text("HiDPI Studio").font(.system(size: 14, weight: .semibold))
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 7) {
+                if let icon = AppBranding.icon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 52, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .accessibilityHidden(true)
+                }
+                Text("HiDPI Studio")
+                    .font(.system(size: 13, weight: .semibold))
                 Text("\(model.displays.count) 块显示器")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 4)
             Menu {
                 Button(action: refresh) { Label("刷新显示器", systemImage: "arrow.clockwise") }.disabled(isConfiguring)
                 Button {
@@ -89,57 +117,106 @@ struct StatusPanelView: View {
                 Divider()
                 Button("退出 HiDPI Studio", action: quit)
             } label: {
-                Image(systemName: "ellipsis.circle").font(.system(size: 18)).foregroundStyle(.secondary)
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
             }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
             .accessibilityLabel("更多操作")
-        }.padding(.horizontal, 16).padding(.vertical, 12)
+            .padding(.top, 2)
+            .padding(.trailing, 16)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
     }
 
-    private var displayPicker: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6)], spacing: 6) {
-            ForEach(model.displays) { display in
-                let isSelected = model.selectedDisplay == display.id
-                Button {
-                    model.selectedDisplay = display.id
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: display.isBuiltin ? "laptopcomputer" : "display")
-                            .font(.system(size: 17)).frame(width: 24)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(display.name).font(.system(size: 11, weight: .medium)).lineLimit(2).help(display.name)
-                            Text(model.renderedMode(for: display)?.sizeLabel ?? "显示模式未知")
-                                .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isSelected ? StudioStyle.accent : Color.secondary)
-                    }
-                    .padding(8).frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(StudioStyle.accent.opacity(0.12))
-                                .matchedGeometryEffect(id: "display", in: displaySelection)
-                        } else {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035))
-                        }
+    private var iconTabs: some View {
+        HStack(spacing: 5) {
+            localTab(.resolution, symbol: "display.2", label: "显示模式")
+            localTab(.brightness, symbol: "sun.max.fill", label: "亮度")
+            sectionTab(.automation, symbol: "arrow.triangle.2.circlepath")
+            sectionTab(.virtual, symbol: "rectangle.on.rectangle")
+            sectionTab(.layouts, symbol: "rectangle.3.group")
+            sectionTab(.shortcuts, symbol: "keyboard")
+            sectionTab(.settings, symbol: "gearshape")
+        }
+        .padding(6)
+        .background(
+            Color.white.opacity(0.09),
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+        )
+        .padding(.horizontal, 20)
+    }
+
+    private func localTab(_ tab: ControlTab, symbol: String, label: String) -> some View {
+        Button { activeTab = tab } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(activeTab == tab ? Color.white : Color.white.opacity(0.58))
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background {
+                    if activeTab == tab {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(StudioStyle.accent)
                     }
                 }
-                .buttonStyle(StudioPressStyle())
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-            }
         }
-        .disabled(isConfiguring)
-        .animation(reduceMotion ? nil : StudioStyle.selection, value: model.selectedDisplay)
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(activeTab == tab ? .isSelected : [])
     }
 
-    private func displayControls(_ display: DisplayInfo) -> some View {
-        return VStack(alignment: .leading, spacing: 14) {
-            resolutionControls(display)
-            Divider()
-            brightnessControls(display)
-        }.padding(14).statusSurface()
+    private func sectionTab(_ section: StudioSection, symbol: String) -> some View {
+        Button { openSection(section) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.58))
+                .frame(maxWidth: .infinity, minHeight: 34)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(section.title)
+    }
+
+    private var resolutionGrid: some View {
+        VStack(spacing: 0) {
+            ForEach(model.displays) { display in
+                resolutionControls(display)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                if display.id != model.displays.last?.id {
+                    Divider().overlay(Color.white.opacity(0.14)).padding(.horizontal, 14)
+                }
+            }
+        }
+        .statusSurface()
+    }
+
+    private var brightnessGrid: some View {
+        VStack(spacing: 0) {
+            ForEach(model.displays) { display in
+                brightnessControls(display)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                if display.id != model.displays.last?.id {
+                    Divider().overlay(Color.white.opacity(0.14)).padding(.horizontal, 14)
+                }
+            }
+        }
+        .statusSurface()
+    }
+
+    private func refreshBrightnessReadings() {
+        for display in model.displays {
+            daily.refreshSystemBrightness(displayID: display.id)
+        }
     }
 
     private func resolutionGroups(for display: DisplayInfo) -> [ModeGroup] {
@@ -163,13 +240,25 @@ struct StatusPanelView: View {
         let currentIndex = groups.firstIndex {
             $0.representative.width == current?.width && $0.representative.height == current?.height
         } ?? 0
-        let index = groups.firstIndex { $0.id == resolutionPreviewID } ?? currentIndex
-        let preview = resolutionPreviewID.flatMap { id in groups.first { $0.id == id } }?
+        let previewID = resolutionPreviewIDs[display.id]
+        let index = groups.firstIndex { $0.id == previewID } ?? currentIndex
+        let preview = previewID.flatMap { id in groups.first { $0.id == id } }?
             .preferred(selectedID: nil, current: current, preferredRate: current?.refreshRate)
         let mode = preview ?? current
         let blocked = isConfiguring || model.hasPendingConfiguration || workspace.hasConnectedScreens
             || model.externalOperationBlocked() || display.isMirrored
         return VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Label(display.name, systemImage: display.isBuiltin ? "laptopcomputer" : "display")
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button("更多…") {
+                    model.selectedDisplay = display.id
+                    openSection(.resolution)
+                }
+                    .buttonStyle(.borderless).font(.system(size: 12))
+            }
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(mode?.sizeLabel ?? "显示模式未知")
@@ -178,8 +267,6 @@ struct StatusPanelView: View {
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
-                Button("更多…") { openSection(.resolution) }
-                    .buttonStyle(.borderless).font(.system(size: 12))
             }
             if groups.count > 1 {
                 Slider(
@@ -187,12 +274,12 @@ struct StatusPanelView: View {
                         get: { Double(index) },
                         set: { value in
                             let next = min(max(Int(value.rounded()), 0), groups.count - 1)
-                            resolutionPreviewID = groups[next].id
+                            resolutionPreviewIDs[display.id] = groups[next].id
                         }),
                     in: 0...Double(groups.count - 1), step: 1,
                     onEditingChanged: { editing in
                         if editing {
-                            resolutionIdentity = DisplayIdentity.capture(display.id)
+                            resolutionIdentities[display.id] = DisplayIdentity.capture(display.id)
                         } else {
                             applyResolution(for: display.id)
                         }
@@ -217,11 +304,11 @@ struct StatusPanelView: View {
 
     private func applyResolution(for displayID: CGDirectDisplayID) {
         defer {
-            resolutionPreviewID = nil
-            resolutionIdentity = nil
+            resolutionPreviewIDs[displayID] = nil
+            resolutionIdentities[displayID] = nil
         }
-        guard let groupID = resolutionPreviewID, let identity = resolutionIdentity,
-            let display = model.currentDisplay, display.id == displayID,
+        guard let groupID = resolutionPreviewIDs[displayID], let identity = resolutionIdentities[displayID],
+            let display = model.display(for: displayID),
             identity.matches(displayID), !isConfiguring, !model.hasPendingConfiguration,
             !workspace.hasConnectedScreens, !model.externalOperationBlocked(),
             let group = resolutionGroups(for: display).first(where: { $0.id == groupID })
@@ -230,8 +317,7 @@ struct StatusPanelView: View {
         // Returning to the current desktop size should not change its HiDPI/rate variant.
         guard mode.width != display.current?.width || mode.height != display.current?.height else { return }
         if !mode.isHiDPI { model.showLowResolution = true }
-        model.selectedMode = mode.id
-        model.applyNative()
+        model.applyNative(displayID: displayID, mode: mode)
     }
 
     @ViewBuilder private func brightnessControls(_ display: DisplayInfo) -> some View {
@@ -239,8 +325,14 @@ struct StatusPanelView: View {
             let value = daily.systemBrightnessValue(for: display.id) ?? reading.value
             VStack(spacing: 9) {
                 HStack {
+                    Label(display.name, systemImage: display.isBuiltin ? "laptopcomputer" : "display")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer()
+                }
+                HStack {
                     Text(reading.backend == .system ? "系统亮度" : "硬件亮度")
-                        .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
                     Spacer()
                     if daily.isChangingSystemBrightness(displayID: display.id) {
                         ProgressView().controlSize(.mini).accessibilityLabel("正在应用亮度")
@@ -264,19 +356,28 @@ struct StatusPanelView: View {
                 }
             }
         } else {
-            HStack(alignment: .top, spacing: 8) {
-                if let identity = DisplayIdentity.capture(display.id),
-                    daily.readingBrightnessIDs.contains(identity.uuid)
-                {
-                    ProgressView().controlSize(.small)
-                    Text("正在读取屏幕亮度…")
-                } else {
-                    Image(systemName: "sun.max")
-                    Text(daily.nativeUnavailableReason(for: display.id) ?? "亮度尚未读取")
-                    Spacer(minLength: 0)
-                    Button("重试") { daily.refreshSystemBrightness(displayID: display.id) }.buttonStyle(.borderless)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(display.name, systemImage: display.isBuiltin ? "laptopcomputer" : "display")
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer()
                 }
-            }.font(.system(size: 11)).foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 8) {
+                    if let identity = DisplayIdentity.capture(display.id),
+                        daily.readingBrightnessIDs.contains(identity.uuid)
+                    {
+                        ProgressView().controlSize(.small)
+                        Text("正在读取屏幕亮度…")
+                    } else {
+                        Image(systemName: "sun.max")
+                        Text(daily.nativeUnavailableReason(for: display.id) ?? "亮度尚未读取")
+                        Spacer(minLength: 0)
+                        Button("重试") { daily.refreshSystemBrightness(displayID: display.id) }.buttonStyle(.borderless)
+                    }
+                }
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -305,13 +406,22 @@ struct StatusPanelView: View {
     }
 
     private var footer: some View {
-        Button {
-            openSection(model.activeSection)
-        } label: {
-            Label("打开主窗口", systemImage: "macwindow")
-                .font(.system(size: 12, weight: .medium))
-                .frame(maxWidth: .infinity)
-        }.buttonStyle(.borderless).padding(14)
+        HStack(spacing: 10) {
+            Button { openSection(.settings) } label: {
+                Label("设置", systemImage: "gearshape")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 38)
+            }
+            .buttonStyle(StatusFooterButtonStyle())
+            Button(action: quit) {
+                Label("退出", systemImage: "power")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 38)
+            }
+            .buttonStyle(StatusFooterButtonStyle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
     }
 
 }
@@ -320,12 +430,27 @@ private struct StatusSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                Color(nsColor: .controlBackgroundColor).opacity(0.8),
+                Color.white.opacity(0.085),
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
+                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5))
+    }
+}
+
+private struct StatusFooterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.white.opacity(configuration.isPressed ? 0.72 : 0.82))
+            .background(
+                Color.white.opacity(configuration.isPressed ? 0.14 : 0.09),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 0.5)
+            )
     }
 }
 

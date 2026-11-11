@@ -14,13 +14,12 @@
 
 <p align="center">
   <a href="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml"><img src="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml/badge.svg?branch=main" alt="构建状态"></a>
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?label=release" alt="最新正式版本"></a>
   <a href="#兼容性与权限"><img src="https://img.shields.io/badge/macOS-13%2B-007AFF" alt="macOS 13 或更新版本"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-34C759" alt="MIT 许可证"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-macOS-arm64.zip"><strong>下载 macOS 应用</strong></a> ·
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><strong>下载 macOS 应用</strong></a> ·
   <a href="#界面预览">界面预览</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
   <a href="https://github.com/BrandonVee/HiDPIStudio/issues">问题反馈</a>
@@ -30,20 +29,20 @@
   <img src="docs/images/display-modes.png" width="1000" alt="HiDPI Studio 显示模式界面：内置 Retina 屏幕、桌面尺寸、渲染分辨率与刷新率选择">
 </p>
 
-<p align="center"><sub>v2.4.0 真实界面 · macOS 26.4 · 内置 Retina 屏幕</sub></p>
+<p align="center"><sub>真实界面 · 内置 Retina 屏幕</sub></p>
 
 ## 快速开始
 
-1. 下载 [v2.4.2 · Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-macOS-arm64.zip)，或在 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 查看所有版本。
+1. 在 [Releases](https://github.com/BrandonVee/HiDPIStudio/releases) 下载 Apple Silicon 安装包。
 2. 解压，将 **HiDPI Studio.app** 移到“应用程序”文件夹后打开。
 3. 在左侧选择显示器；调整分辨率后，先试用，再在 **15 秒内确认**保留。
 
 > 当前安装包使用 **ad-hoc 签名**，尚未经 Developer ID 签名或 Apple 公证。首次打开如被 macOS 拦截，请按系统“隐私与安全性”中的提示允许打开。
 
-应用不需要关闭 SIP 或安装显示器驱动。安装包附带 [SHA256 校验文件](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-SHA256SUMS.txt)，将它与 ZIP 放在同一目录后可运行：
+应用不需要关闭 SIP 或安装显示器驱动。安装包附带 SHA256 校验文件，将它与 ZIP 放在同一目录后运行：
 
 ```bash
-shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
+shasum -a 256 --check HiDPIStudio-*-SHA256SUMS.txt
 ```
 
 ## 功能亮点
@@ -51,7 +50,7 @@ shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
 | 功能 | 可以做什么 |
 | --- | --- |
 | **HiDPI 显示模式** | 按桌面尺寸分组浏览原生模式，选择刷新率；自定义 24–240 Hz HiDPI，优先匹配原生模式，否则使用虚拟 Retina 屏幕镜像。 |
-| **菜单栏控制中心** | 紧凑快捷面板，显示器选择自动换行，无需滚动；用分档滑动条调整分辨率，松开后试用并确认，直接调节亮度；右键保留原生快捷菜单。 |
+| **菜单栏控制中心** | 深色圆角控制中心，使用图标导航切换分辨率与亮度；显示器以纵向卡片呈现，用分档滑动条调整分辨率，松开后试用并确认，直接调节亮度。 |
 | **系统与 DDC 亮度** | 优先系统亮度接口，受支持的外接屏使用 DDC；写入后读回确认。 |
 | **独立软件滤镜** | 进一步调暗画面或添加暖色，软件亮度保留最低 20%；不冒充硬件背光。 |
 | **虚拟桌面与画中画** | 最多保存 8 个虚拟屏幕定义，按需连接；通过 ScreenCaptureKit 预览屏幕，最高 1080p / 30 fps。 |
@@ -71,7 +70,7 @@ shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
   <img src="docs/images/daily-controls.png" width="1000" alt="日常控制界面：系统亮度、软件亮度、暖色强度及分辨率收藏">
 </p>
 
-截图取自真实 v2.4.0 应用，当前仅连接内置 Retina 屏幕；外接屏能力依硬件与连接方式而异。
+截图取自真实应用，当前仅连接内置 Retina 屏幕；外接屏能力依硬件与连接方式而异。
 
 ## 使用方式
 
@@ -84,7 +83,7 @@ shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
 
 | 项目 | 当前范围 |
 | --- | --- |
-| 系统 | 构建目标为 **macOS 13+**；已有硬件验证环境为 macOS 26.4 / Apple M5 Pro。 |
+| 系统 | 构建目标为 **macOS 13+**；已有硬件验证环境包含 Apple Silicon。 |
 | 安装包 | **Apple Silicon / arm64**；未提供 Intel 安装包。 |
 | 界面语言 | 简体中文；本文档提供中文、英文两个版本。 |
 | 录屏权限 | 仅在主动启动画中画预览时请求。 |
@@ -142,29 +141,6 @@ open '.build/HiDPI Studio.app'
 ```
 
 产物位于 `dist/`。`--test-virtual`、`--test-workspace` 和 `--test-persistence` 会创建临时虚拟屏幕；实体亮度/模式写入测试也需要明确选择，不应作为日常检查自动运行。详见 [验证说明](docs/VALIDATION.md)。
-
-### CI/CD
-
-- 推送 `main`、向 `main` 提交 PR 或从分支手动运行：构建 ARM64 应用、运行隔离检查、上传 ZIP 与 SHA256 构建产物；从版本标签手动运行会继续执行正式 Release 发布。
-- 推送版本标签：检查版本一致性，通过后自动发布正式 Release 并标记为 Latest。
-- 本机发布按 **GitLab → GitHub** 的顺序备份并校验分支和标签。
-
-查看 [Actions](https://github.com/BrandonVee/HiDPIStudio/actions) 或 [完整发布流程](docs/RELEASING.md)。
-
-<details>
-<summary><strong>代码结构</strong></summary>
-
-| 文件 | 职责 |
-| --- | --- |
-| `DisplayCore.swift` / `HiddenDisplayModes.h/.m` | 原生显示模式、事务、快照与恢复。 |
-| `NativeBrightness.swift` / `DDCBrightness.swift` / `DDCTransport.h/.m` | 系统与 DDC 亮度控制。 |
-| `DailyControls.swift` | 软件滤镜、收藏与亮度界面。 |
-| `VirtualWorkspace.swift` / `ScreenPreview.swift` | 虚拟桌面及画中画。 |
-| `LayoutProfiles.swift` / `AutoRestore.swift` | 布局预设与唤醒/重连恢复。 |
-| `BrightnessSync.swift` / `NativeBrightnessKeys.swift` | 亮度联动与原生亮度键。 |
-| `StudioView.swift` / `StatusPanel.swift` / `AppDelegate.swift` | 主窗口、菜单栏控制中心与生命周期。 |
-
-</details>
 
 ## 参与项目
 

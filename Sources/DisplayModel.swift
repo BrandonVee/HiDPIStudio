@@ -69,6 +69,7 @@ final class DisplayModel: ObservableObject {
     private var displayNames: [CGDirectDisplayID: String] = [:]
 
     var currentDisplay: DisplayInfo? { displays.first { $0.id == selectedDisplay } }
+    func display(for id: CGDirectDisplayID) -> DisplayInfo? { displays.first { $0.id == id } }
     var hasTrial: Bool { remaining > 0 }
     var hasPendingConfiguration: Bool { pendingNative != nil || virtualSnapshot != nil }
     var virtualSourceID: CGDirectDisplayID? { virtual?.displayID }
@@ -172,6 +173,19 @@ final class DisplayModel: ObservableObject {
     }
     func applyNative() {
         guard canApply, let display = currentDisplay, let mode = chosenMode else { return }
+        applyNative(display: display, mode: mode)
+    }
+    func applyNative(displayID: CGDirectDisplayID, mode: DisplayMode) {
+        guard let display = display(for: displayID), canApply(display: display, mode: mode) else { return }
+        applyNative(display: display, mode: mode)
+    }
+    private func canApply(display: DisplayInfo, mode: DisplayMode) -> Bool {
+        guard display.modes.contains(where: { $0.id == mode.id }) else { return false }
+        return !externalOperationBlocked() && !isShuttingDown && !isBusy && !hasTrial && pendingNative == nil
+            && virtual == nil && virtualSnapshot == nil && !display.isMirrored
+            && mode.signature != display.current?.signature
+    }
+    private func applyNative(display: DisplayInfo, mode: DisplayMode) {
         let snapshot = DisplaySnapshot(ids: [display.id])
         guard !snapshot.entries.isEmpty else {
             error = "无法保存当前显示设置，已取消切换。"

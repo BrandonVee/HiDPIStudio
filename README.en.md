@@ -14,13 +14,12 @@
 
 <p align="center">
   <a href="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml"><img src="https://github.com/BrandonVee/HiDPIStudio/actions/workflows/build-release.yml/badge.svg?branch=main" alt="Build status"></a>
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/HiDPIStudio?label=release" alt="Latest stable release"></a>
   <a href="#compatibility-and-permissions"><img src="https://img.shields.io/badge/macOS-13%2B-007AFF" alt="macOS 13 or later"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-34C759" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-macOS-arm64.zip"><strong>Download for macOS</strong></a> ·
+  <a href="https://github.com/BrandonVee/HiDPIStudio/releases"><strong>Download for macOS</strong></a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="https://github.com/BrandonVee/HiDPIStudio/issues">Report an issue</a>
@@ -30,20 +29,20 @@
   <img src="docs/images/display-modes.png" width="1000" alt="HiDPI Studio display modes: a built-in Retina panel, desktop sizes, rendering resolutions, and refresh rates">
 </p>
 
-<p align="center"><sub>Actual v2.4.0 interface · macOS 26.4 · built-in Retina display</sub></p>
+<p align="center"><sub>Actual interface · built-in Retina display</sub></p>
 
 ## Getting started
 
-1. Download [v2.4.2 for Apple Silicon](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-macOS-arm64.zip), or browse all [Releases](https://github.com/BrandonVee/HiDPIStudio/releases).
+1. Download the Apple Silicon build from [Releases](https://github.com/BrandonVee/HiDPIStudio/releases).
 2. Unzip the download, move **HiDPI Studio.app** to **Applications**, and open it.
 3. Select a display in the sidebar. When changing its resolution, try the mode and confirm within **15 seconds** to keep it.
 
 > The app is **signed ad hoc**, and **not Developer ID signed or notarized by Apple**. If macOS blocks the first launch, follow the prompts in **System Settings → Privacy & Security** to allow the app to open.
 
-You do not need to disable SIP or install display drivers. To verify your download, save the [SHA256 checksum file](https://github.com/BrandonVee/HiDPIStudio/releases/download/v2.4.2/HiDPIStudio-v2.4.2-SHA256SUMS.txt) alongside the ZIP and run:
+You do not need to disable SIP or install display drivers. Each release includes a SHA256 checksum file; save it alongside the ZIP and run:
 
 ```bash
-shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
+shasum -a 256 --check HiDPIStudio-*-SHA256SUMS.txt
 ```
 
 ## Features
@@ -51,7 +50,7 @@ shasum -a 256 --check HiDPIStudio-v2.4.2-SHA256SUMS.txt
 | Feature | What it does |
 | --- | --- |
 | **HiDPI display modes** | Browse native modes grouped by desktop size and choose a refresh rate. Custom HiDPI supports 24–240 Hz: it prefers a matching native mode, otherwise mirrors a virtual Retina display. |
-| **Menu bar control center** | A compact panel with wrapping display selection and no scrolling. Use a stepped resolution slider to preview sizes, release to try and confirm, and adjust brightness directly. Right-click keeps a native shortcut menu. |
+| **Menu bar control center** | A dark rounded control center with icon navigation for resolution and brightness. Displays use vertical cards, with a stepped resolution slider for preview and confirmation plus direct brightness adjustment. |
 | **System and DDC brightness** | Prefer the system brightness API, with DDC for supported external displays. Every write is checked by reading back the result. |
 | **Separate software filters** | Dim the picture further or add warmth, with a 20% software-brightness floor. Filters do not change the panel's backlight. |
 | **Virtual desktops and picture-in-picture** | Save up to eight virtual-display definitions and connect them on demand. Preview screens through ScreenCaptureKit at up to 1080p / 30 fps. |
@@ -71,7 +70,7 @@ The interface uses native materials, continuous corners, and spring feedback, an
   <img src="docs/images/daily-controls.png" width="1000" alt="Daily controls: system brightness, software brightness, warmth, and resolution favorites">
 </p>
 
-These are real screenshots of v2.4.0 with a built-in Retina display connected. The app interface is currently in Simplified Chinese; the language links above switch the documentation. External-display capabilities depend on the hardware and connection.
+These are real screenshots with a built-in Retina display connected. The app interface is currently in Simplified Chinese; the language links above switch the documentation. External-display capabilities depend on the hardware and connection.
 
 ## Everyday use
 
@@ -84,7 +83,7 @@ These are real screenshots of v2.4.0 with a built-in Retina display connected. T
 
 | Item | Current support |
 | --- | --- |
-| macOS | Deployment target: **macOS 13+**. Existing hardware checks used macOS 26.4 on an Apple M5 Pro. |
+| macOS | Deployment target: **macOS 13+**. Existing hardware checks include Apple Silicon. |
 | Release binaries | **Apple Silicon / arm64**. No Intel installer is provided. |
 | App language | Simplified Chinese. Documentation is available in Chinese and English. |
 | Screen Recording | Requested only when you start a picture-in-picture preview. |
@@ -142,29 +141,6 @@ The script builds for the current Mac's architecture. Release packaging is valid
 ```
 
 Artifacts are written to `dist/`. `--test-virtual`, `--test-workspace`, and `--test-persistence` create temporary virtual displays. Checks that write physical brightness or modes also require an explicit choice and should not run as routine tests. See [validation details](docs/VALIDATION.md) (Chinese).
-
-### CI/CD
-
-- Push to `main`, open a PR against `main`, or manually run the workflow from a branch: build the ARM64 app, run isolated checks, and upload ZIP and SHA256 artifacts. Manually running it from a version tag also publishes the stable Release.
-- Push a version tag: verify version consistency, then publish a stable release and mark it as Latest after successful checks.
-- The maintainer's local publishing process backs up and verifies branches and tags on **GitLab before GitHub**.
-
-See [Actions](https://github.com/BrandonVee/HiDPIStudio/actions) and the [release guide](docs/RELEASING.md) (Chinese).
-
-<details>
-<summary><strong>Source layout</strong></summary>
-
-| Files | Responsibility |
-| --- | --- |
-| `DisplayCore.swift` / `HiddenDisplayModes.h/.m` | Native display modes, transactions, snapshots, and restoration. |
-| `NativeBrightness.swift` / `DDCBrightness.swift` / `DDCTransport.h/.m` | System and DDC brightness. |
-| `DailyControls.swift` | Software filters, favorites, and brightness UI. |
-| `VirtualWorkspace.swift` / `ScreenPreview.swift` | Virtual desktops and picture-in-picture. |
-| `LayoutProfiles.swift` / `AutoRestore.swift` | Layout presets and wake/reconnect restoration. |
-| `BrightnessSync.swift` / `NativeBrightnessKeys.swift` | Brightness sync and native brightness keys. |
-| `StudioView.swift` / `StatusPanel.swift` / `AppDelegate.swift` | Main window, menu bar control center, and lifecycle. |
-
-</details>
 
 ## Contributing
 
