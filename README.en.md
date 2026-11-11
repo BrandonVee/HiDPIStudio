@@ -77,7 +77,7 @@ These are real screenshots of v2.4.0 with a built-in Retina display connected. T
 
 - **Quick adjustments:** left-click the menu bar icon to open the control center, or right-click for shortcuts. Closing the main window leaves the app running in the menu bar.
 - **Save a setup:** create a preset under Layouts & Presets, then access it from the main window, menu bar, or a shortcut.
-- **Enable automation:** select follower displays or a restore preset under Sync & Restore in the main window before enabling the corresponding feature. F1/F2 and global shortcuts are under Shortcuts.
+- **Enable automation:** select follower displays or a restore preset under Sync & Restore in the main window before enabling the corresponding feature. F1/F2 and global shortcuts are under Software Settings.
 - **Quit the app:** confirmed native display modes stay in effect. Virtual displays, mirroring, and software filters require the app to keep running.
 
 ## Compatibility and permissions
@@ -145,7 +145,7 @@ Artifacts are written to `dist/`. `--test-virtual`, `--test-workspace`, and `--t
 
 ### CI/CD
 
-- Push to `main`, open a PR against `main`, or run the workflow manually: build the ARM64 app, run isolated checks, and upload ZIP and SHA256 artifacts.
+- Push to `main`, open a PR against `main`, or manually run the workflow from a branch: build the ARM64 app, run isolated checks, and upload ZIP and SHA256 artifacts. Manually running it from a version tag also publishes the stable Release.
 - Push a version tag: verify version consistency, then publish a stable release and mark it as Latest after successful checks.
 - The maintainer's local publishing process backs up and verifies branches and tags on **GitLab before GitHub**.
 

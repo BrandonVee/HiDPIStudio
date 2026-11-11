@@ -86,8 +86,24 @@ struct StudioView: View {
                         customSection(display)
                     }
                 } else {
-                    Label("尚未检测到显示器。连接显示器后点击刷新。", systemImage: "display.trianglebadge.exclamationmark")
-                        .padding(.vertical, 40)
+                    VStack(spacing: 12) {
+                        Image(systemName: "display.trianglebadge.exclamationmark")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        Text("尚未检测到显示器")
+                            .font(.headline)
+                        Text("连接显示器后重新检测，即可开始调整分辨率和亮度。")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("重新检测") { model.refresh() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.isBusy || model.hasTrial)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 56)
                 }
             case .daily:
                 DailyControlsView(displayModel: model, manager: daily)
@@ -106,6 +122,11 @@ struct StudioView: View {
                 StudioShortcutsView(
                     manager: shortcuts, favoriteNames: daily.favorites.map(\.name),
                     profileNames: layouts.profiles.map(\.name))
+            case .settings:
+                SoftwareSettingsView(
+                    shortcuts: shortcuts, nativeKeys: nativeKeys, brightnessSync: brightnessSync,
+                    autoRestore: autoRestore,
+                    openSection: { model.activeSection = $0 })
             }
         }
     }
@@ -188,27 +209,6 @@ struct StudioView: View {
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .padding(18)
             }
-            Divider().padding(.horizontal, 16)
-            VStack(alignment: .leading, spacing: 14) {
-                Button {
-                    model.refresh()
-                } label: {
-                    Label("刷新显示器", systemImage: "arrow.clockwise")
-                }
-                .disabled(model.isBusy || model.hasTrial)
-                Button {
-                    model.exportDiagnostics()
-                } label: {
-                    Label("导出显示诊断", systemImage: "square.and.arrow.up")
-                }
-                .disabled(model.isBusy || model.hasTrial)
-                Button {
-                    NSWorkspace.shared.open(
-                        URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
-                } label: {
-                    Label("系统显示设置", systemImage: "gearshape")
-                }
-            }.buttonStyle(.plain).font(.system(size: 12)).padding(20)
             Text("关闭窗口后，菜单栏继续运行。")
                 .font(.system(size: 10)).foregroundStyle(.secondary).padding(.horizontal, 20).padding(.bottom, 18)
         }.frame(width: 232)

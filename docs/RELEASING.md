@@ -7,7 +7,7 @@
 | 触发方式 | 结果 |
 | --- | --- |
 | 推送 `main` / 向 `main` 提交 PR | 构建、运行隔离检查、验证签名和 ZIP，上传 14 天有效的构建产物。 |
-| Actions 手动运行 | 同样构建；选择版本标签时也会执行发布。 |
+| Actions 手动运行 | 选择分支时只构建并上传产物；选择 `vMAJOR.MINOR.PATCH` 标签时也会执行正式 Release 发布。 |
 | 推送 `vMAJOR.MINOR.PATCH` 标签 | 检查标签与应用版本一致，构建通过后创建草稿、上传 ZIP 与 SHA256，再发布正式 Release 并标记为 Latest。 |
 
 流程文件：`.github/workflows/build-release.yml`。构建 job 只有代码读取权限，发布 job 才有 `contents: write`；使用 GitHub 自带的 `GITHUB_TOKEN`，无需另存个人访问令牌。依赖的 Actions 固定到提交 SHA。
@@ -21,6 +21,8 @@
 5. 查看 GitHub Actions 的标签运行。只有构建、隔离检查、安装包签名和下载后校验全部通过，Release 才会公开。
 
 `git publish` 是本机已有的发布命令，不属于 Git 自带命令。其他开发机需要按同样顺序分别推送并验证 GitLab 与 GitHub；不要绕过备份直接发布 GitHub 标签。
+
+手动运行 workflow 时，Actions 页面上的 **Use workflow from** 选择会决定发布行为：选择 `main` 或其他分支只执行构建，选择版本标签会触发发布 job。发布前确认标签已经推送到 GitHub，且 `CHANGELOG.md`、`Resources/Info.plist` 与标签版本一致。
 
 ## 产物
 

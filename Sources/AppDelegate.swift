@@ -98,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于 HiDPI Studio", action: #selector(about), keyEquivalent: "")
+        appMenu.addItem(withTitle: "导出显示诊断", action: #selector(exportDiagnostics), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "退出 HiDPI Studio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -351,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
         applyProfile(id: id)
     }
     @objc private func resetFilters() { daily.resetAll() }
+    @objc private func exportDiagnostics() { model.exportDiagnostics() }
     private func manualDisplayOperationStarted() {
         brightnessSync.suspendForConfiguration()
         if !autoRestore.isBusy { autoRestore.cancelPendingForUserChange() }

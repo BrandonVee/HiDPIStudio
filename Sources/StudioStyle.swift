@@ -15,6 +15,7 @@ enum StudioStyle {
         case .virtual: return .purple
         case .layouts: return .indigo
         case .shortcuts: return .gray
+        case .settings: return .indigo
         }
     }
 }

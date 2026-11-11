@@ -1,7 +1,7 @@
 import Foundation
 
 enum StudioSection: String, CaseIterable, Identifiable {
-    case resolution, daily, automation, virtual, layouts, shortcuts
+    case resolution, daily, automation, virtual, layouts, shortcuts, settings
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -11,6 +11,7 @@ enum StudioSection: String, CaseIterable, Identifiable {
         case .virtual: return "虚拟屏幕与预览"
         case .layouts: return "布局与预设"
         case .shortcuts: return "快捷键"
+        case .settings: return "软件设置"
         }
     }
     var symbol: String {
@@ -21,6 +22,7 @@ enum StudioSection: String, CaseIterable, Identifiable {
         case .virtual: return "rectangle.on.rectangle"
         case .layouts: return "rectangle.3.group"
         case .shortcuts: return "keyboard"
+        case .settings: return "gearshape"
         }
     }
     var subtitle: String {
@@ -31,6 +33,7 @@ enum StudioSection: String, CaseIterable, Identifiable {
         case .virtual: return "创建独立桌面，或在浮动窗口中预览屏幕。"
         case .layouts: return "安排屏幕位置，保存并切换显示配置。"
         case .shortcuts: return "用组合键打开工具、切换收藏和配置。"
+        case .settings: return "配置应用行为、快捷键与自动恢复。"
         }
     }
 }
