@@ -11,6 +11,7 @@ enum StudioStyle {
         switch section {
         case .resolution: return .blue
         case .daily: return .orange
+        case .details: return .cyan
         case .automation: return .teal
         case .virtual: return .purple
         case .layouts: return .indigo

@@ -52,7 +52,10 @@ shasum -a 256 --check HiDPIStudio-*-SHA256SUMS.txt
 | **HiDPI display modes** | Browse native modes grouped by desktop size and choose a refresh rate. Custom HiDPI supports 24–240 Hz: it prefers a matching native mode, otherwise mirrors a virtual Retina display. |
 | **Menu bar control center** | A dark rounded control center with icon navigation for resolution and brightness. Displays use vertical cards, with a stepped resolution slider for preview and confirmation plus direct brightness adjustment. |
 | **System and DDC brightness** | Prefer the system brightness API, with DDC for supported external displays. Every write is checked by reading back the result. |
-| **Separate software filters** | Dim the picture further or add warmth, with a 20% software-brightness floor. Filters do not change the panel's backlight. |
+| **Separate software filters** | Dim the picture all the way to black or add warmth. Filters do not change the panel's backlight. |
+| **Display details and diagnostics** | Inspect display IDs, vendor/product/serial values, ColorSync UUID, physical size, rotation, mirroring, and mode capabilities; copy or export a report. |
+| **Display aliases and color profiles** | Save a custom name for each screen and inspect its current ColorSync profile, wide-gamut, PQ, and HLG status. |
+| **Keep displays awake** | Prevent automatic display sleep during presentations, previews, or long work sessions from Settings or the menu bar. |
 | **Virtual desktops and picture-in-picture** | Save up to eight virtual-display definitions and connect them on demand. Preview screens through ScreenCaptureKit at up to 1080p / 30 fps. |
 | **Layouts, favorites, and presets** | Arrange displays, choose a main display, and save modes and layouts by display identity. Mode and layout changes include a confirmation trial. |
 | **Brightness sync and automatic restore** | Follow built-in brightness using a separate ratio for each external screen, or restore a selected preset after wake or reconnection. Both are off by default. |
@@ -77,6 +80,7 @@ These are real screenshots with a built-in Retina display connected. The app int
 - **Quick adjustments:** left-click the menu bar icon to open the control center, or right-click for shortcuts. Closing the main window leaves the app running in the menu bar.
 - **Save a setup:** create a preset under Layouts & Presets, then access it from the main window, menu bar, or a shortcut.
 - **Enable automation:** select follower displays or a restore preset under Sync & Restore in the main window before enabling the corresponding feature. F1/F2 and global shortcuts are under Software Settings.
+- **Manage displays:** save aliases, inspect ColorSync profiles, and copy diagnostics under Display Details. During a presentation or preview, enable Keep Displays Awake from Software Settings or the menu bar.
 - **Quit the app:** confirmed native display modes stay in effect. Virtual displays, mirroring, and software filters require the app to keep running.
 
 ## Compatibility and permissions

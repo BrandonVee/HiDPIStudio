@@ -10,6 +10,7 @@ struct StudioView: View {
     @ObservedObject var brightnessSync: BrightnessSyncManager
     @ObservedObject var autoRestore: AutoRestoreManager
     @ObservedObject var nativeKeys: NativeBrightnessKeyManager
+    @ObservedObject var keepAwake: KeepAwakeManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var navigationSelection
     @Namespace private var displaySelection
@@ -107,6 +108,8 @@ struct StudioView: View {
                 }
             case .daily:
                 DailyControlsView(displayModel: model, manager: daily)
+            case .details:
+                DisplayDetailsView(displayModel: model)
             case .automation:
                 BrightnessSyncView(displayModel: model, manager: brightnessSync)
                 Divider()
@@ -125,7 +128,7 @@ struct StudioView: View {
             case .settings:
                 SoftwareSettingsView(
                     shortcuts: shortcuts, nativeKeys: nativeKeys, brightnessSync: brightnessSync,
-                    autoRestore: autoRestore,
+                    autoRestore: autoRestore, keepAwake: keepAwake,
                     openSection: { model.activeSection = $0 })
             }
         }

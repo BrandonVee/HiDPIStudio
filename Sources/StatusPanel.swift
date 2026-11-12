@@ -13,6 +13,7 @@ struct StatusPanelView: View {
     @ObservedObject var layouts: LayoutProfileManager
     @ObservedObject var workspace: VirtualWorkspace
     @ObservedObject var autoRestore: AutoRestoreManager
+    @ObservedObject var keepAwake: KeepAwakeManager
     let openSection: (StudioSection) -> Void
     let refresh: () -> Void
     let quit: () -> Void
@@ -113,6 +114,9 @@ struct StatusPanelView: View {
                         URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension")!)
                 } label: {
                     Label("系统显示设置…", systemImage: "gearshape")
+                }
+                Toggle(isOn: Binding(get: { keepAwake.enabled }, set: keepAwake.setEnabled)) {
+                    Label("保持显示器唤醒", systemImage: "moon.zzz")
                 }
                 Divider()
                 Button("退出 HiDPI Studio", action: quit)

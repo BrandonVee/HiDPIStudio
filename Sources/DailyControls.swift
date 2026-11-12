@@ -8,9 +8,9 @@ struct SoftwareDisplayAdjustment: Equatable {
 
     init(brightness: Double = 1, warmth: Double = 0) throws {
         guard brightness.isFinite, warmth.isFinite,
-            (0.2...1).contains(brightness), (0...1).contains(warmth)
+            (0...1).contains(brightness), (0...1).contains(warmth)
         else {
-            throw DisplayFailure(message: "软件亮度需在 20–100%，暖色强度需在 0–100%。")
+            throw DisplayFailure(message: "软件亮度需在 0–100%，暖色强度需在 0–100%。")
         }
         self.brightness = brightness
         self.warmth = warmth
@@ -645,7 +645,7 @@ struct DailyControlsView: View {
                     "软件亮度",
                     value: Binding(
                         get: { manager.adjustment(for: display.id).brightness * 100 },
-                        set: { manager.setBrightness($0 / 100, for: display.id) }), range: 20...100,
+                        set: { manager.setBrightness($0 / 100, for: display.id) }), range: 0...100,
                     symbol: "sun.max")
                 sliderRow(
                     "暖色强度",
@@ -661,7 +661,7 @@ struct DailyControlsView: View {
             if let reason {
                 Text(reason).font(.caption).foregroundStyle(.secondary)
             } else {
-                Text("仅在应用运行期间生效；最低亮度保留 20%，暖色强度不代表校准色温。")
+                Text("仅在应用运行期间生效；可调暗至全黑，暖色强度不代表校准色温。")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

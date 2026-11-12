@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
     let brightnessSync = BrightnessSyncManager()
     let autoRestore = AutoRestoreManager()
     let nativeKeys = NativeBrightnessKeyManager()
+    let keepAwake = KeepAwakeManager()
     private var subscriptions = Set<AnyCancellable>()
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -133,7 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
         window.contentView = NSHostingView(
             rootView: StudioView(
                 model: model, daily: daily, workspace: workspace, layouts: layouts, shortcuts: shortcuts,
-                brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys))
+                brightnessSync: brightnessSync, autoRestore: autoRestore, nativeKeys: nativeKeys,
+                keepAwake: keepAwake))
         window.minSize = NSSize(width: 900, height: 748)
         window.isReleasedWhenClosed = false
         window.center()
@@ -157,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
         let panel = StatusPanelView(
             model: model, daily: daily, layouts: layouts, workspace: workspace,
             autoRestore: autoRestore,
+            keepAwake: keepAwake,
             openSection: { [weak self] in self?.openStatusSection($0) },
             refresh: { [weak self] in self?.refreshFromStatus() },
             quit: { NSApp.terminate(nil) }, panelWidth: width)
@@ -406,6 +409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSPopo
         stopStatusPanelMonitoring()
         statusPopover.performClose(nil)
         nativeKeys.shutdown()
+        keepAwake.shutdown()
         autoRestore.shutdown()
         brightnessSync.shutdown()
         subscriptions.removeAll()

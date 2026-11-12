@@ -14,15 +14,15 @@ enum DailyControlChecks {
             NativeBrightnessService.matches(0.5001, 0.5) && !NativeBrightnessService.matches(0.49, 0.5),
             "Native brightness must reject an unapplied request")
         for (brightness, warmth) in [
-            (0.19, 0.0), (1.01, 0.0), (1.0, -0.01), (1.0, 1.01), (.nan, 0.0), (1.0, .infinity),
+            (-0.01, 0.0), (1.01, 0.0), (1.0, -0.01), (1.0, 1.01), (.nan, 0.0), (1.0, .infinity),
         ] {
             var rejected = false
             do { _ = try SoftwareDisplayAdjustment(brightness: brightness, warmth: warmth) } catch { rejected = true }
             try StudioChecks.require(rejected, "Invalid software filter adjustment was accepted")
         }
-        let floor = try SoftwareDisplayAdjustment(brightness: 0.2, warmth: 1)
+        let floor = try SoftwareDisplayAdjustment(brightness: 0, warmth: 1)
         try StudioChecks.require(
-            floor.dimOpacity <= 0.8 && floor.warmOpacity <= 0.25,
+            floor.dimOpacity == 1 && floor.warmOpacity <= 0.25,
             "Software filters exceeded their visibility limits")
         try StudioChecks.require(
             SoftwareDisplayAdjustment.neutral.isNeutral,

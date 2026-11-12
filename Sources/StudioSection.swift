@@ -1,12 +1,13 @@
 import Foundation
 
 enum StudioSection: String, CaseIterable, Identifiable {
-    case resolution, daily, automation, virtual, layouts, shortcuts, settings
+    case resolution, daily, details, automation, virtual, layouts, shortcuts, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .resolution: return "显示模式"
         case .daily: return "日常控制"
+        case .details: return "显示器详情"
         case .automation: return "联动与恢复"
         case .virtual: return "虚拟屏幕与预览"
         case .layouts: return "布局与预设"
@@ -18,6 +19,7 @@ enum StudioSection: String, CaseIterable, Identifiable {
         switch self {
         case .resolution: return "display"
         case .daily: return "sun.max"
+        case .details: return "info.circle"
         case .automation: return "arrow.triangle.2.circlepath"
         case .virtual: return "rectangle.on.rectangle"
         case .layouts: return "rectangle.3.group"
@@ -29,6 +31,7 @@ enum StudioSection: String, CaseIterable, Identifiable {
         switch self {
         case .resolution: return "选择清晰的桌面尺寸与刷新率。"
         case .daily: return "调节系统亮度、添加软件滤镜，收藏常用分辨率。"
+        case .details: return "查看设备身份、物理尺寸、旋转方向和模式能力。"
         case .automation: return "让外接屏跟随亮度，唤醒或重连后恢复预设。"
         case .virtual: return "创建独立桌面，或在浮动窗口中预览屏幕。"
         case .layouts: return "安排屏幕位置，保存并切换显示配置。"

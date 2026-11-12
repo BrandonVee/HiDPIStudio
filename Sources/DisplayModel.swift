@@ -1,4 +1,5 @@
 import AppKit
+import ColorSync
 import Combine
 
 /// A single outstanding trial. Wall-clock deadlines survive delayed timer ticks.
@@ -48,6 +49,7 @@ final class DisplayModel: ObservableObject {
     @Published var message = "选择显示器，使用 HiDPI 模式改善文字显示。"
     @Published var virtualTarget: CGDirectDisplayID?
     @Published var virtualSize: CustomSize?
+    @Published private(set) var displayAliases: [String: String] = [:]
     private var virtual: HDVirtualDisplay?
     private var virtualSnapshot: DisplaySnapshot?
     private struct NativeTrial {
@@ -67,6 +69,8 @@ final class DisplayModel: ObservableObject {
     private var refreshWork: DispatchWorkItem?
     private var operationGeneration = 0
     private var displayNames: [CGDirectDisplayID: String] = [:]
+    private let defaults: UserDefaults
+    private let displayAliasesKey = "HiDPIStudio.displayAliases.v1"
 
     var currentDisplay: DisplayInfo? { displays.first { $0.id == selectedDisplay } }
     func display(for id: CGDirectDisplayID) -> DisplayInfo? { displays.first { $0.id == id } }
@@ -103,8 +107,17 @@ final class DisplayModel: ObservableObject {
         return display.current
     }
 
-    init(nativeSaveScope: CGConfigureOption = .permanently) {
+    init(nativeSaveScope: CGConfigureOption = .permanently, defaults: UserDefaults = .standard) {
         self.nativeSaveScope = nativeSaveScope
+        self.defaults = defaults
+        if let data = defaults.data(forKey: displayAliasesKey),
+            let decoded = try? JSONDecoder().decode([String: String].self, from: data)
+        {
+            displayAliases = decoded.reduce(into: [:]) { result, pair in
+                let name = pair.value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !name.isEmpty { result[pair.key] = String(name.prefix(64)) }
+            }
+        }
         trial.onTick = { [weak self] in self?.remaining = $0 }
         trial.onExpire = { [weak self] in Task { @MainActor in await self?.revertTrial() } }
         refresh()
@@ -133,14 +146,38 @@ final class DisplayModel: ObservableObject {
         let all = DisplayCore.displays()
         displays = all.filter { !$0.isStudioVirtual }.map { display in
             if !display.name.hasPrefix("外接显示器 ") { displayNames[display.id] = display.name }
+            let baseName = displayNames[display.id] ?? display.name
+            let alias = DisplayIdentity.capture(display.id).flatMap { displayAliases[$0.uuid] }
             return DisplayInfo(
-                id: display.id, name: displayNames[display.id] ?? display.name, isBuiltin: display.isBuiltin,
+                id: display.id, name: alias ?? baseName, isBuiltin: display.isBuiltin,
                 isStudioVirtual: display.isStudioVirtual, current: display.current, modes: display.modes)
         }
         if !displays.contains(where: { $0.id == selectedDisplay }) {
             selectedDisplay = displays.first?.id ?? 0
         }
         if !visibleModes.contains(where: { $0.id == selectedMode }) { selectPreferredMode() }
+    }
+    func alias(for displayID: CGDirectDisplayID) -> String? {
+        guard let identity = DisplayIdentity.capture(displayID) else { return nil }
+        return displayAliases[identity.uuid]
+    }
+    func setAlias(_ value: String, for displayID: CGDirectDisplayID) {
+        guard let identity = DisplayIdentity.capture(displayID) else { return }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            displayAliases[identity.uuid] = nil
+        } else {
+            displayAliases[identity.uuid] = String(trimmed.prefix(64))
+        }
+        do {
+            let data = try JSONEncoder().encode(displayAliases)
+            defaults.set(data, forKey: displayAliasesKey)
+            error = nil
+            refresh()
+            message = trimmed.isEmpty ? "已恢复系统显示器名称。" : "已保存显示器名称“\(String(trimmed.prefix(64)))”。"
+        } catch {
+            self.error = "显示器名称保存失败：\(error.localizedDescription)"
+        }
     }
     private func screenChanged() {
         guard !isBusy else { return }
@@ -424,12 +461,34 @@ final class DisplayModel: ObservableObject {
     }
     func diagnostics() -> String {
         let items: [[String: Any]] = DisplayCore.displays().map { display in
-            [
+            let physicalSize = CGDisplayScreenSize(display.id)
+            let identity = DisplayIdentity.capture(display.id)
+            var item: [String: Any] = [
                 "id": display.id, "name": display.name, "builtIn": display.isBuiltin,
+                "displayUUID": identity?.uuid ?? "",
+                "vendor": CGDisplayVendorNumber(display.id),
+                "product": CGDisplayModelNumber(display.id),
+                "serial": CGDisplaySerialNumber(display.id),
+                "isMain": CGDisplayIsMain(display.id) != 0,
+                "rotation": CGDisplayRotation(display.id),
+                "physicalWidthMM": physicalSize.width,
+                "physicalHeightMM": physicalSize.height,
                 "mirrorSource": CGDisplayMirrorsDisplay(display.id),
                 "current": display.current.map { modeJSON($0) } ?? [:],
                 "modes": display.modes.map(modeJSON),
             ]
+            if let profile = ColorSyncProfileCreateWithDisplayID(display.id)?.takeRetainedValue() {
+                let md5 = ColorSyncProfileGetMD5(profile)
+                let digest = withUnsafeBytes(of: md5.digest) { Data($0) }
+                    .map { String(format: "%02x", $0) }
+                    .joined()
+                item["colorProfileName"] = (ColorSyncProfileCopyDescriptionString(profile)?.takeRetainedValue() as String?) ?? ""
+                item["colorProfileWideGamut"] = ColorSyncProfileIsWideGamut(profile)
+                item["colorProfilePQ"] = ColorSyncProfileIsPQBased(profile)
+                item["colorProfileHLG"] = ColorSyncProfileIsHLGBased(profile)
+                item["colorProfileMD5"] = digest
+            }
+            return item
         }
         let document: [String: Any] = [
             "app": "HiDPI Studio "

@@ -8,10 +8,11 @@ struct SoftwareSettingsView: View {
     @ObservedObject var nativeKeys: NativeBrightnessKeyManager
     @ObservedObject var brightnessSync: BrightnessSyncManager
     @ObservedObject var autoRestore: AutoRestoreManager
+    @ObservedObject var keepAwake: KeepAwakeManager
     let openSection: (StudioSection) -> Void
 
     private var firstError: String? {
-        shortcuts.error ?? nativeKeys.error ?? brightnessSync.error ?? autoRestore.error
+        shortcuts.error ?? nativeKeys.error ?? brightnessSync.error ?? autoRestore.error ?? keepAwake.error
     }
 
     var body: some View {
@@ -48,6 +49,12 @@ struct SoftwareSettingsView: View {
                     title: "自动恢复",
                     detail: autoRestore.enabled ? "已启用，在唤醒或重连后恢复所选预设。" : "关闭时不自动恢复布局预设。",
                     isOn: Binding(get: { autoRestore.enabled }, set: autoRestore.setEnabled))
+                Divider().padding(.leading, 56)
+                toggleRow(
+                    icon: "moon.zzz",
+                    title: "保持显示器唤醒",
+                    detail: keepAwake.isActive ? "已启用，防止系统自动关闭显示器。" : "关闭时遵循 macOS 当前的睡眠设置。",
+                    isOn: Binding(get: { keepAwake.enabled }, set: keepAwake.setEnabled))
             }
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
